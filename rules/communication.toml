@@ -23,7 +23,7 @@ capture = 1
 
 [rule.validate]
 prefix = ["SK"]
-charset = "a-f0-9"
+charset = "A-Za-f0-9"
 length = 34
 
 [[rule]]

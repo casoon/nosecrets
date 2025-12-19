@@ -170,21 +170,22 @@ impl Prefilter {
             }
             for keyword in &rule.rule.keywords {
                 keyword_map
-                    .entry(keyword.to_string())
+                    .entry(keyword.to_lowercase())
                     .or_default()
                     .push(idx);
             }
         }
-        let keywords: Vec<String> = keyword_map.keys().cloned().collect();
-        let keyword_rules: Vec<Vec<usize>> = keywords
-            .iter()
-            .map(|keyword| keyword_map.get(keyword).cloned().unwrap_or_default())
-            .collect();
+        // Collect keywords and rules in a consistent order
+        let mut entries: Vec<(String, Vec<usize>)> = keyword_map.into_iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        let keywords: Vec<String> = entries.iter().map(|(k, _)| k.clone()).collect();
+        let keyword_rules: Vec<Vec<usize>> = entries.into_iter().map(|(_, v)| v).collect();
         let ac = if keywords.is_empty() {
             None
         } else {
             AhoCorasickBuilder::new()
                 .ascii_case_insensitive(true)
+                .match_kind(aho_corasick::MatchKind::Standard)
                 .build(&keywords)
                 .ok()
         };
@@ -200,7 +201,9 @@ impl Prefilter {
         let Some(ac) = &self.ac else {
             return candidates.into_iter().collect();
         };
-        for mat in ac.find_iter(text) {
+        // Use find_overlapping_iter to catch all matches including overlapping ones
+        // e.g., "sk_live_" should match both "sk" and "sk_live_" keywords
+        for mat in ac.find_overlapping_iter(text) {
             let idx = mat.pattern().as_usize();
             if let Some(rules) = self.keyword_rules.get(idx) {
                 candidates.extend(rules.iter().copied());

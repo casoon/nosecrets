@@ -33,6 +33,9 @@ struct ScanArgs {
     /// Ask to ignore findings interactively
     #[arg(long)]
     interactive: bool,
+    /// Show findings but always exit with code 0
+    #[arg(long)]
+    dry_run: bool,
     /// Output format
     #[arg(long, value_enum, default_value = "text")]
     format: OutputFormat,
@@ -98,7 +101,8 @@ fn run_scan(args: ScanArgs) -> Result<()> {
         OutputFormat::Text => report.print_terminal()?,
         OutputFormat::Json => report.print_json()?,
     }
-    std::process::exit(report.exit_code());
+    let exit_code = if args.dry_run { 0 } else { report.exit_code() };
+    std::process::exit(exit_code);
 }
 
 fn run_ignore(args: IgnoreArgs) -> Result<()> {

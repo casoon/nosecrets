@@ -133,6 +133,13 @@ pub fn load_builtin_rules() -> Result<Vec<Rule>, RulesError> {
         )),
         "rules/payment.toml",
     )?);
+    rules.extend(parse_rules(
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../rules/communication.toml"
+        )),
+        "rules/communication.toml",
+    )?);
     Ok(rules)
 }
 

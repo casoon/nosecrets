@@ -4,14 +4,27 @@
 id = "github-pat"
 name = "GitHub Personal Access Token"
 severity = "critical"
-pattern = '''\b(ghp_[A-Za-z0-9]{36})\b'''
+pattern = '''\b(ghp_[A-Za-z0-9]{36,})\b'''
 keywords = ["ghp_"]
 capture = 1
 
 [rule.validate]
 prefix = ["ghp_"]
-charset = "A-Za-z0-9"
-length = 40
+charset = "A-Za-z0-9_"
+min_length = 40
+
+[[rule]]
+id = "github-fine-grained-pat"
+name = "GitHub Fine-Grained Personal Access Token"
+severity = "critical"
+pattern = '''\b(github_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59})\b'''
+keywords = ["github_pat_"]
+capture = 1
+
+[rule.validate]
+prefix = ["github_pat_"]
+charset = "A-Za-z0-9_"
+min_length = 90
 
 [[rule]]
 id = "github-oauth"
@@ -23,7 +36,7 @@ capture = 1
 
 [rule.validate]
 prefix = ["gho_"]
-charset = "A-Za-z0-9"
+charset = "A-Za-z0-9_"
 length = 40
 
 [[rule]]
@@ -36,7 +49,7 @@ capture = 1
 
 [rule.validate]
 prefix = ["ghu_", "ghs_"]
-charset = "A-Za-z0-9"
+charset = "A-Za-z0-9_"
 length = 40
 
 [[rule]]
@@ -62,7 +75,7 @@ capture = 1
 
 [rule.validate]
 prefix = ["npm_"]
-charset = "A-Za-z0-9"
+charset = "A-Za-z0-9_"
 length = 40
 
 [[rule]]

@@ -4,8 +4,9 @@
 id = "private-key"
 name = "Private Key (PEM)"
 severity = "critical"
-pattern = '''-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----'''
-keywords = ["begin", "private", "key"]
+pattern = '''(-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----)'''
+keywords = ["BEGIN", "PRIVATE", "KEY"]
+capture = 1
 
 [rule.paths]
 exclude = ["*.pub", "*.crt", "*.cer"]

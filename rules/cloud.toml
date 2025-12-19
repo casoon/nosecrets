@@ -1,0 +1,105 @@
+# Cloud Provider Secrets
+
+[[rule]]
+id = "aws-access-key"
+name = "AWS Access Key ID"
+severity = "critical"
+pattern = '''\b((?:AKIA|ABIA|ACCA|ASIA)[A-Z2-7]{16})\b'''
+keywords = ["akia", "abia", "acca", "asia"]
+capture = 1
+
+[rule.validate]
+prefix = ["AKIA", "ABIA", "ACCA", "ASIA"]
+charset = "A-Z2-7"
+length = 20
+
+[rule.allow]
+patterns = ["EXAMPLE$", "SAMPLE$"]
+
+[[rule]]
+id = "aws-secret-key"
+name = "AWS Secret Access Key"
+severity = "critical"
+pattern = '''(?i)aws.{0,20}secret.{0,20}['\"\s=:]([A-Za-z0-9/+=]{40})['\"\s]'''
+keywords = ["aws", "secret"]
+capture = 1
+
+[rule.validate]
+charset = "A-Za-z0-9/+="
+length = 40
+
+[[rule]]
+id = "gcp-api-key"
+name = "Google Cloud API Key"
+severity = "critical"
+pattern = '''\b(AIza[A-Za-z0-9_-]{35})\b'''
+keywords = ["aiza"]
+capture = 1
+
+[rule.validate]
+prefix = ["AIza"]
+charset = "A-Za-z0-9_-"
+length = 39
+
+[[rule]]
+id = "azure-storage-key"
+name = "Azure Storage Account Key"
+severity = "critical"
+pattern = '''(?i)(?:account.?key|storage.?key).{0,20}['\"\s=:]([A-Za-z0-9/+=]{88})['\"\s]'''
+keywords = ["account", "storage", "key", "azure"]
+capture = 1
+
+[rule.validate]
+charset = "A-Za-z0-9/+="
+length = 88
+
+[[rule]]
+id = "digitalocean-token"
+name = "DigitalOcean Access Token"
+severity = "critical"
+pattern = '''\b(dop_v1_[a-f0-9]{64})\b'''
+keywords = ["dop_v1_"]
+capture = 1
+
+[rule.validate]
+prefix = ["dop_v1_"]
+charset = "a-f0-9"
+length = 71
+
+[[rule]]
+id = "cloudflare-api-token"
+name = "Cloudflare API Token"
+severity = "critical"
+pattern = '''(?i)(?:cloudflare|cf[_-]?api).{0,20}(?:token|key).{0,10}['"\s=:]([a-z0-9_-]{40})['"\s]'''
+keywords = ["cloudflare", "cf_api"]
+capture = 1
+
+[rule.validate]
+charset = "a-z0-9_-"
+length = 40
+
+[rule.allow]
+patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "cloudflare-global-api-key"
+name = "Cloudflare Global API Key"
+severity = "critical"
+pattern = '''(?i)(?:cloudflare|cf[_-]?api).{0,20}(?:global.{0,5}key|api[_-]?key).{0,10}['"\s=:]([a-f0-9]{37})['"\s]'''
+keywords = ["cloudflare", "cf_api"]
+capture = 1
+
+[rule.validate]
+charset = "a-f0-9"
+length = 37
+
+[rule.allow]
+patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "cloudflare-origin-ca-key"
+name = "Cloudflare Origin CA Key"
+severity = "critical"
+pattern = '''\b(v1\.0-[a-f0-9]{24}-[a-f0-9]{146})\b'''
+keywords = ["cloudflare", "v1.0-"]
+capture = 1

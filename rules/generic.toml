@@ -1,0 +1,70 @@
+# Generic Secrets
+
+[[rule]]
+id = "private-key"
+name = "Private Key (PEM)"
+severity = "critical"
+pattern = '''-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----'''
+keywords = ["begin", "private", "key"]
+
+[rule.paths]
+exclude = ["*.pub", "*.crt", "*.cer"]
+
+[[rule]]
+id = "generic-api-key"
+name = "Generic API Key"
+severity = "medium"
+pattern = '''(?i)(?:api[_-]?key|apikey)\s*[=:]\s*['\"]?([A-Za-z0-9_-]{20,})['\"]?'''
+keywords = ["api_key", "apikey", "api-key"]
+capture = 1
+
+[rule.validate]
+min_length = 20
+charset = "A-Za-z0-9_-"
+
+[rule.allow]
+patterns = ["^[A-Z_]+$", "example", "your.*here"]
+
+[[rule]]
+id = "generic-secret"
+name = "Generic Secret"
+severity = "medium"
+pattern = '''(?i)(?:secret|client.?secret)\s*[=:]\s*['\"]?([A-Za-z0-9_-]{16,})['\"]?'''
+keywords = ["secret", "client_secret"]
+capture = 1
+
+[rule.validate]
+min_length = 16
+charset = "A-Za-z0-9_-"
+
+[rule.allow]
+patterns = ["^[A-Z_]+$", "example", "changeme", "xxx"]
+
+[[rule]]
+id = "password-assignment"
+name = "Password Assignment"
+severity = "medium"
+pattern = '''(?i)(?:password|passwd|pwd)\s*[=:]\s*['\"]([^'\"]{8,})['\"]'''
+keywords = ["password", "passwd", "pwd"]
+capture = 1
+
+[rule.validate]
+min_length = 8
+
+[rule.allow]
+patterns = ["changeme", "password", "^test", "^xxx", "^\\*+$"]
+
+[rule.paths]
+exclude = ["*.md", "*.txt", "docs/"]
+
+[[rule]]
+id = "basic-auth"
+name = "Basic Auth Header"
+severity = "high"
+pattern = '''(?i)authorization\s*[=:]\s*['\"]?basic\s+([A-Za-z0-9+/]+=*)['\"]?'''
+keywords = ["authorization", "basic"]
+capture = 1
+
+[rule.validate]
+charset = "A-Za-z0-9+/="
+min_length = 8

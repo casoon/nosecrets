@@ -1,0 +1,119 @@
+# Deployment / Hosting Secrets
+
+[[rule]]
+id = "netlify-access-token"
+name = "Netlify Access Token"
+severity = "critical"
+pattern = '''(?i)netlify.{0,20}(?:token|auth|api[_-]?key).{0,10}['"\s=:]([a-z0-9=_-]{40,46})['"\s]'''
+keywords = ["netlify", "netlify_token", "netlify_auth"]
+capture = 1
+
+[rule.validate]
+min_length = 40
+max_length = 46
+charset = "a-z0-9=_-"
+
+[rule.allow]
+patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "flyio-access-token"
+name = "Fly.io Access Token"
+severity = "critical"
+pattern = '''\b((?:fo1_[\w-]{43}|fm1[ar]_[A-Za-z0-9+/]{100,}={0,3}|fm2_[A-Za-z0-9+/]{100,}={0,3}))\b'''
+keywords = ["fo1_", "fm1", "fm2_"]
+capture = 1
+
+[rule.validate]
+prefix = ["fo1_", "fm1a_", "fm1r_", "fm2_"]
+
+[[rule]]
+id = "heroku-api-key"
+name = "Heroku API Key"
+severity = "critical"
+pattern = '''(?i)heroku.{0,20}(?:api[_-]?key|token).{0,10}['"\s=:]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})['"\s]'''
+keywords = ["heroku"]
+capture = 1
+
+[rule.validate]
+charset = "0-9a-f-"
+length = 36
+
+[[rule]]
+id = "heroku-api-key-v2"
+name = "Heroku API Key v2"
+severity = "critical"
+pattern = '''\b(HRKU-AA[0-9A-Za-z_-]{58})\b'''
+keywords = ["hrku-aa"]
+capture = 1
+
+[rule.validate]
+prefix = ["HRKU-AA"]
+length = 65
+
+[[rule]]
+id = "vercel-token"
+name = "Vercel Token"
+severity = "high"
+pattern = '''(?i)vercel.{0,20}(?:token|api[_-]?key).{0,10}['"\s=:]([A-Za-z0-9_-]{20,})['"\s]'''
+keywords = ["vercel", "vercel_token"]
+capture = 1
+
+[rule.validate]
+min_length = 20
+charset = "A-Za-z0-9_-"
+
+[rule.allow]
+patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "railway-token"
+name = "Railway Token"
+severity = "high"
+pattern = '''(?i)railway.{0,20}(?:token|api[_-]?key).{0,10}['"\s=:]([A-Za-z0-9_-]{20,})['"\s]'''
+keywords = ["railway", "railway_token"]
+capture = 1
+
+[rule.validate]
+min_length = 20
+charset = "A-Za-z0-9_-"
+
+[rule.allow]
+patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "render-api-key"
+name = "Render API Key"
+severity = "high"
+pattern = '''(?i)render.{0,20}(?:api[_-]?key|token).{0,10}['"\s=:]([A-Za-z0-9_-]{20,})['"\s]'''
+keywords = ["render", "render_api"]
+capture = 1
+
+[rule.validate]
+min_length = 20
+charset = "A-Za-z0-9_-"
+
+[rule.allow]
+patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "supabase-anon-key"
+name = "Supabase Anon Key"
+severity = "high"
+pattern = '''(?i)supabase.{0,20}anon.{0,20}['"\s=:]([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)'''
+keywords = ["supabase", "anon", "supabase_anon"]
+capture = 1
+
+[rule.validate]
+min_length = 60
+
+[[rule]]
+id = "supabase-service-role-key"
+name = "Supabase Service Role Key"
+severity = "critical"
+pattern = '''(?i)supabase.{0,20}service[_-]?role.{0,20}['"\s=:]([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)'''
+keywords = ["supabase", "service_role", "supabase_service"]
+capture = 1
+
+[rule.validate]
+min_length = 60

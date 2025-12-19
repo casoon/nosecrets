@@ -1,0 +1,8 @@
+- id: nosecrets
+  name: nosecrets
+  description: Detect secrets in staged files
+  entry: nosecrets scan --staged
+  language: rust
+  types: [text]
+  stages: [pre-commit]
+  pass_filenames: false

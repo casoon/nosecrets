@@ -1,0 +1,114 @@
+# Code Platform & Communication Secrets
+
+[[rule]]
+id = "github-pat"
+name = "GitHub Personal Access Token"
+severity = "critical"
+pattern = '''\b(ghp_[A-Za-z0-9]{36})\b'''
+keywords = ["ghp_"]
+capture = 1
+
+[rule.validate]
+prefix = ["ghp_"]
+charset = "A-Za-z0-9"
+length = 40
+
+[[rule]]
+id = "github-oauth"
+name = "GitHub OAuth Token"
+severity = "critical"
+pattern = '''\b(gho_[A-Za-z0-9]{36})\b'''
+keywords = ["gho_"]
+capture = 1
+
+[rule.validate]
+prefix = ["gho_"]
+charset = "A-Za-z0-9"
+length = 40
+
+[[rule]]
+id = "github-app"
+name = "GitHub App Token"
+severity = "high"
+pattern = '''\b(ghu_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36})\b'''
+keywords = ["ghu_", "ghs_"]
+capture = 1
+
+[rule.validate]
+prefix = ["ghu_", "ghs_"]
+charset = "A-Za-z0-9"
+length = 40
+
+[[rule]]
+id = "gitlab-pat"
+name = "GitLab Personal Access Token"
+severity = "critical"
+pattern = '''\b(glpat-[A-Za-z0-9_-]{20})\b'''
+keywords = ["glpat-"]
+capture = 1
+
+[rule.validate]
+prefix = ["glpat-"]
+charset = "A-Za-z0-9_-"
+length = 26
+
+[[rule]]
+id = "npm-token"
+name = "npm Access Token"
+severity = "critical"
+pattern = '''\b(npm_[A-Za-z0-9]{36})\b'''
+keywords = ["npm_"]
+capture = 1
+
+[rule.validate]
+prefix = ["npm_"]
+charset = "A-Za-z0-9"
+length = 40
+
+[[rule]]
+id = "pypi-token"
+name = "PyPI API Token"
+severity = "critical"
+pattern = '''\b(pypi-[A-Za-z0-9_-]{50,})\b'''
+keywords = ["pypi-"]
+capture = 1
+
+[rule.validate]
+prefix = ["pypi-"]
+charset = "A-Za-z0-9_-"
+min_length = 55
+
+[[rule]]
+id = "slack-token"
+name = "Slack Token"
+severity = "critical"
+pattern = '''\b(xox[pboars]-[0-9]{10,13}-[0-9]{10,13}(?:-[0-9]{10,13})?-[a-zA-Z0-9]{24,32})\b'''
+keywords = ["xoxp-", "xoxb-", "xoxo-", "xoxa-", "xoxr-", "xoxs-"]
+capture = 1
+
+[rule.validate]
+prefix = ["xoxp-", "xoxb-", "xoxo-", "xoxa-", "xoxr-", "xoxs-"]
+
+[[rule]]
+id = "slack-webhook"
+name = "Slack Webhook URL"
+severity = "high"
+pattern = '''(https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[a-zA-Z0-9]{24})'''
+keywords = ["hooks.slack.com"]
+capture = 1
+
+[[rule]]
+id = "discord-token"
+name = "Discord Bot Token"
+severity = "critical"
+pattern = '''\b([MN][A-Za-z0-9]{23,}\.[\w-]{6}\.[\w-]{27,})\b'''
+keywords = ["discord"]
+capture = 1
+
+[[rule]]
+id = "discord-webhook"
+name = "Discord Webhook URL"
+severity = "high"
+pattern = '''(https://discord(?:app)?\.com/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{60,68})'''
+keywords = ["discord.com/api/webhooks", "discordapp.com/api/webhooks"]
+capture = 1

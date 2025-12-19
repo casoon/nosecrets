@@ -1,0 +1,67 @@
+# Database Connection Secrets
+
+[[rule]]
+id = "postgres-connection-uri"
+name = "Postgres Connection URI"
+severity = "high"
+pattern = '''(?i)\bpostgres(?:ql)?:\/\/[^:\s\/]+:([^@\s\/]+)@[^ \n'\"]+'''
+keywords = ["postgres", "postgresql"]
+capture = 1
+
+[rule.allow]
+patterns = ["example", "changeme", "password", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "mysql-connection-uri"
+name = "MySQL Connection URI"
+severity = "high"
+pattern = '''(?i)\b(?:mysql|mariadb):\/\/[^:\s\/]+:([^@\s\/]+)@[^ \n'\"]+'''
+keywords = ["mysql", "mariadb"]
+capture = 1
+
+[rule.allow]
+patterns = ["example", "changeme", "password", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "mongodb-connection-uri"
+name = "MongoDB Connection URI"
+severity = "high"
+pattern = '''(?i)\bmongodb(?:\+srv)?:\/\/[^:\s\/]+:([^@\s\/]+)@[^ \n'\"]+'''
+keywords = ["mongodb", "mongo"]
+capture = 1
+
+[rule.allow]
+patterns = ["example", "changeme", "password", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "redis-connection-uri"
+name = "Redis Connection URI"
+severity = "high"
+pattern = '''(?i)\bredis(?:s)?:\/\/[^@\s]*:([^@\s]+)@[^ \n'\"]+'''
+keywords = ["redis", "rediss"]
+capture = 1
+
+[rule.allow]
+patterns = ["example", "changeme", "password", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "mssql-connection-uri"
+name = "SQL Server Connection URI"
+severity = "high"
+pattern = '''(?i)\b(?:mssql|sqlserver):\/\/[^:\s\/]+:([^@\s\/]+)@[^ \n'\"]+'''
+keywords = ["mssql", "sqlserver"]
+capture = 1
+
+[rule.allow]
+patterns = ["example", "changeme", "password", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "jdbc-password-param"
+name = "JDBC Connection Password"
+severity = "high"
+pattern = '''(?i)\bjdbc:(?:postgresql|mysql|mariadb|sqlserver|mssql):\/\/[^\s'\"]{0,200}?(?:password|pwd)=([^&\s'\"]{6,})'''
+keywords = ["jdbc", "password"]
+capture = 1
+
+[rule.allow]
+patterns = ["example", "changeme", "password", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]

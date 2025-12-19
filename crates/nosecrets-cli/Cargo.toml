@@ -1,0 +1,21 @@
+[package]
+name = "nosecrets-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+nosecrets-core = { path = "../nosecrets-core" }
+nosecrets-rules = { path = "../nosecrets-rules" }
+nosecrets-filter = { path = "../nosecrets-filter" }
+nosecrets-report = { path = "../nosecrets-report" }
+
+[[bin]]
+name = "nosecrets"
+path = "src/main.rs"

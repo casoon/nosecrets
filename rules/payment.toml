@@ -1,0 +1,76 @@
+# Payment Provider Secrets
+
+[[rule]]
+id = "stripe-secret-key"
+name = "Stripe Secret Key"
+severity = "critical"
+pattern = '''\b(sk_live_[a-zA-Z0-9]{24,})\b'''
+keywords = ["sk_live_"]
+capture = 1
+
+[rule.validate]
+prefix = ["sk_live_"]
+min_length = 32
+
+[[rule]]
+id = "stripe-restricted-key"
+name = "Stripe Restricted Key"
+severity = "critical"
+pattern = '''\b(rk_live_[a-zA-Z0-9]{24,})\b'''
+keywords = ["rk_live_"]
+capture = 1
+
+[rule.validate]
+prefix = ["rk_live_"]
+min_length = 32
+
+[[rule]]
+id = "stripe-webhook-secret"
+name = "Stripe Webhook Secret"
+severity = "high"
+pattern = '''\b(whsec_[a-zA-Z0-9]{32,})\b'''
+keywords = ["whsec_"]
+capture = 1
+
+[rule.validate]
+prefix = ["whsec_"]
+min_length = 38
+
+[[rule]]
+id = "paypal-client-secret"
+name = "PayPal Client Secret"
+severity = "critical"
+pattern = '''(?i)paypal.{0,20}(?:client.?secret|secret).{0,10}['"\s=:]([A-Za-z0-9_-]{40,})['"\s]'''
+keywords = ["paypal", "client_secret"]
+capture = 1
+
+[rule.validate]
+min_length = 40
+charset = "A-Za-z0-9_-"
+
+[rule.allow]
+patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
+
+[[rule]]
+id = "square-access-token"
+name = "Square Access Token"
+severity = "critical"
+pattern = '''\b(sq0atp-[A-Za-z0-9_-]{22})\b'''
+keywords = ["sq0atp-"]
+capture = 1
+
+[rule.validate]
+prefix = ["sq0atp-"]
+length = 29
+
+[[rule]]
+id = "square-oauth-secret"
+name = "Square OAuth Secret"
+severity = "critical"
+pattern = '''\b(sq0csp-[A-Za-z0-9_-]{43})\b'''
+keywords = ["sq0csp-"]
+capture = 1
+
+[rule.validate]
+prefix = ["sq0csp-"]
+length = 50

@@ -8,6 +8,7 @@ rust-version.workspace = true
 description = "Filtering and allowlist logic for nosecrets secret scanner"
 keywords = ["security", "secrets", "filter"]
 categories = ["development-tools"]
+readme = "README.md"
 
 [dependencies]
 serde.workspace = true

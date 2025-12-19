@@ -8,6 +8,7 @@ rust-version.workspace = true
 description = "Reporting and output formatting for nosecrets secret scanner"
 keywords = ["security", "secrets", "report"]
 categories = ["development-tools"]
+readme = "README.md"
 
 [dependencies]
 serde.workspace = true
@@ -16,4 +17,4 @@ sha2.workspace = true
 hex.workspace = true
 console.workspace = true
 thiserror.workspace = true
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.1.6" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.1.7" }

@@ -8,6 +8,7 @@ rust-version.workspace = true
 description = "Rule definitions and parsing for nosecrets secret scanner"
 keywords = ["security", "secrets", "rules"]
 categories = ["development-tools"]
+readme = "README.md"
 
 [dependencies]
 serde.workspace = true

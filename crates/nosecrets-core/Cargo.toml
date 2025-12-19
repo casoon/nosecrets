@@ -8,6 +8,7 @@ rust-version.workspace = true
 description = "Core scanning engine for nosecrets secret scanner"
 keywords = ["security", "secrets", "scanner"]
 categories = ["development-tools"]
+readme = "README.md"
 
 [dependencies]
 anyhow.workspace = true
@@ -17,9 +18,9 @@ rayon.workspace = true
 walkdir.workspace = true
 gix.workspace = true
 globset.workspace = true
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.1.6" }
-nosecrets-filter = { path = "../nosecrets-filter", version = "0.1.6" }
-nosecrets-report = { path = "../nosecrets-report", version = "0.1.6" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.1.7" }
+nosecrets-filter = { path = "../nosecrets-filter", version = "0.1.7" }
+nosecrets-report = { path = "../nosecrets-report", version = "0.1.7" }
 
 [dev-dependencies]
 tempfile.workspace = true

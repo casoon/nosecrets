@@ -8,16 +8,17 @@ rust-version.workspace = true
 description = "Fast, offline secret scanner for Git pre-commit hooks"
 keywords = ["security", "secrets", "git", "pre-commit", "scanner"]
 categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
 
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-nosecrets-core = { path = "../nosecrets-core", version = "0.1.6" }
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.1.6" }
-nosecrets-filter = { path = "../nosecrets-filter", version = "0.1.6" }
-nosecrets-report = { path = "../nosecrets-report", version = "0.1.6" }
+nosecrets-core = { path = "../nosecrets-core", version = "0.1.7" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.1.7" }
+nosecrets-filter = { path = "../nosecrets-filter", version = "0.1.7" }
+nosecrets-report = { path = "../nosecrets-report", version = "0.1.7" }
 
 [[bin]]
 name = "nosecrets"

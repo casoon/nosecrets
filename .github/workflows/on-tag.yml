@@ -6,9 +6,36 @@ on:
       - 'v*'
 
 jobs:
-  trigger-release:
+  verify-and-release:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for CI to complete
+        run: |
+          echo "Waiting for CI workflow to complete..."
+          for i in {1..30}; do
+            STATUS=$(gh run list --commit ${{ github.sha }} --workflow=ci.yml --json status,conclusion --jq '.[0]')
+            RUNNING=$(echo "$STATUS" | jq -r '.status')
+            CONCLUSION=$(echo "$STATUS" | jq -r '.conclusion')
+            
+            if [ "$RUNNING" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "CI passed!"
+                exit 0
+              else
+                echo "CI failed with conclusion: $CONCLUSION"
+                exit 1
+              fi
+            fi
+            echo "CI still running... waiting 10s"
+            sleep 10
+          done
+          echo "Timeout waiting for CI"
+          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Extract version from tag
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT

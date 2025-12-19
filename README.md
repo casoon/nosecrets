@@ -1,4 +1,6 @@
-# nosecrets (v0.1.0)
+# nosecrets
+
+[![CI](https://github.com/casoon/nosecrets/actions/workflows/ci.yml/badge.svg)](https://github.com/casoon/nosecrets/actions/workflows/ci.yml)
 
 Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, and safe for any GitHub repository.
 

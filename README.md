@@ -95,9 +95,22 @@ Rules are shipped in TOML files under `rules/`:
 
 - `rules/cloud.toml` (AWS/GCP/Azure/Cloudflare, etc.)
 - `rules/deploy.toml` (Netlify, Fly.io, Heroku, Vercel, Railway, Render, Supabase)
-- `rules/code.toml` (GitHub/GitLab/npm, etc.)
+- `rules/code.toml` (GitHub/GitLab/npm/Slack/Discord, etc.)
+- `rules/communication.toml` (SendGrid, Twilio, Mailchimp, Mailgun)
 - `rules/database.toml` (Postgres/MySQL/Mongo/Redis, JDBC passwords)
+- `rules/payment.toml` (Stripe)
 - `rules/generic.toml` (private keys, generic secrets, passwords)
+
+### Help improve the rules
+
+The built-in rules are a starting point, but this tool becomes more valuable as the rule set grows and improves. You can define your own rules in a local TOML file, but if you discover new secret patterns or improve existing ones, please consider contributing them back.
+
+**Contributions welcome:**
+- New rules for services not yet covered
+- Improvements to existing patterns (better regex, fewer false positives)
+- Bug reports for missed secrets or false positives
+
+Open an issue or pull request at [github.com/casoon/nosecrets](https://github.com/casoon/nosecrets).
 
 ## Pre-commit integration
 

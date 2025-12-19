@@ -17,14 +17,14 @@ min_length = 40
 id = "github-fine-grained-pat"
 name = "GitHub Fine-Grained Personal Access Token"
 severity = "critical"
-pattern = '''\b(github_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59})\b'''
+pattern = '''\b(github_pat_[A-Za-z0-9_]{36,255})\b'''
 keywords = ["github_pat_"]
 capture = 1
 
 [rule.validate]
 prefix = ["github_pat_"]
 charset = "A-Za-z0-9_"
-min_length = 90
+min_length = 47
 
 [[rule]]
 id = "github-oauth"

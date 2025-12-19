@@ -4,14 +4,14 @@
 id = "sendgrid-api-key"
 name = "SendGrid API Key"
 severity = "critical"
-pattern = '''\b(SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43})\b'''
+pattern = '''\b(SG\.[A-Za-z0-9_-]{15,30}\.[A-Za-z0-9_-]{30,70})\b'''
 keywords = ["SG."]
 capture = 1
 
 [rule.validate]
 prefix = ["SG."]
 charset = "A-Za-z0-9_.\\-"
-min_length = 69
+min_length = 50
 
 [[rule]]
 id = "twilio-api-key"
@@ -30,8 +30,8 @@ length = 34
 id = "twilio-auth-token"
 name = "Twilio Auth Token"
 severity = "critical"
-pattern = '''(?i)twilio.{0,20}(?:auth.?token|token).{0,10}['\"\s=:]([a-f0-9]{32})['\"\s]'''
-keywords = ["twilio", "auth"]
+pattern = '''(?i)(?:twilio|TWILIO).{0,30}(?:auth.?token|token|secret).{0,10}['"\s=:]+([a-f0-9]{32})['"\s]?'''
+keywords = ["twilio", "TWILIO"]
 capture = 1
 
 [rule.validate]

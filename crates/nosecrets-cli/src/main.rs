@@ -115,7 +115,10 @@ fn run_ignore(args: IgnoreArgs) -> Result<()> {
     Ok(())
 }
 
-fn interactive_filter(root: &Path, findings: Vec<nosecrets_report::Finding>) -> Result<Vec<nosecrets_report::Finding>> {
+fn interactive_filter(
+    root: &Path,
+    findings: Vec<nosecrets_report::Finding>,
+) -> Result<Vec<nosecrets_report::Finding>> {
     if findings.is_empty() {
         return Ok(findings);
     }

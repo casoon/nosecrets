@@ -92,51 +92,33 @@ pub enum RulesError {
 pub fn load_builtin_rules() -> Result<Vec<Rule>, RulesError> {
     let mut rules = Vec::new();
     rules.extend(parse_rules(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../rules/cloud.toml"
-        )),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/cloud.toml")),
         "rules/cloud.toml",
     )?);
     rules.extend(parse_rules(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../rules/deploy.toml"
-        )),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/deploy.toml")),
         "rules/deploy.toml",
     )?);
     rules.extend(parse_rules(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../rules/code.toml"
-        )),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/code.toml")),
         "rules/code.toml",
     )?);
     rules.extend(parse_rules(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../rules/database.toml"
-        )),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/database.toml")),
         "rules/database.toml",
     )?);
     rules.extend(parse_rules(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../rules/generic.toml"
-        )),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/generic.toml")),
         "rules/generic.toml",
     )?);
     rules.extend(parse_rules(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../rules/payment.toml"
-        )),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/payment.toml")),
         "rules/payment.toml",
     )?);
     rules.extend(parse_rules(
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../rules/communication.toml"
+            "/rules/communication.toml"
         )),
         "rules/communication.toml",
     )?);

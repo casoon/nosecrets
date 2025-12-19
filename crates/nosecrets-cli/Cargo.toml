@@ -5,16 +5,19 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "Fast, offline secret scanner for Git pre-commit hooks"
+keywords = ["security", "secrets", "git", "pre-commit", "scanner"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-nosecrets-core = { path = "../nosecrets-core" }
-nosecrets-rules = { path = "../nosecrets-rules" }
-nosecrets-filter = { path = "../nosecrets-filter" }
-nosecrets-report = { path = "../nosecrets-report" }
+nosecrets-core = { path = "../nosecrets-core", version = "0.1.6" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.1.6" }
+nosecrets-filter = { path = "../nosecrets-filter", version = "0.1.6" }
+nosecrets-report = { path = "../nosecrets-report", version = "0.1.6" }
 
 [[bin]]
 name = "nosecrets"

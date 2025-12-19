@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+description = "Filtering and allowlist logic for nosecrets secret scanner"
+keywords = ["security", "secrets", "filter"]
+categories = ["development-tools"]
 
 [dependencies]
 serde.workspace = true

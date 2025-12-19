@@ -11,25 +11,21 @@ Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, an
 
 ## Install
 
+### npm (recommended)
+
+```
+npm install -g @casoon/nosecrets
+```
+
 ### Homebrew (macOS)
 
-Recommended for macOS users once you publish a tap:
-
-```
-brew install <tap>/nosecrets
-```
-
-Replace `<tap>` with your tap, e.g. `your-org/tap`.
+Coming soon once nosecrets has been battle-tested.
 
 ### From source (Rust)
 
 ```
 cargo install --path crates/nosecrets-cli
 ```
-
-### Binaries (recommended for CI)
-
-Use GitHub Releases and download the matching artifact for your OS/arch.
 
 ## Usage
 

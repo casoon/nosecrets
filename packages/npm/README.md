@@ -30,14 +30,4 @@ nosecrets scan --staged --interactive
 
 The package ships prebuilt binaries for macOS (x64/arm64), Linux (x64/arm64), and Windows (x64).
 
-## Publishing
-
-Publish manually from this directory:
-
-```bash
-npm publish
-```
-
-Before packing, `prepack` runs `npm run prepare-release`, which downloads the release assets for the current package version from GitHub and populates `vendor/` automatically.
-
 Full documentation: <https://github.com/casoon/nosecrets>

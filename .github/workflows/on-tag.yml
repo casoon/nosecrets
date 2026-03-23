@@ -1,12 +1,16 @@
-name: Release on Tag
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  verify-and-release:
+  verify-ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +22,7 @@ jobs:
             STATUS=$(gh run list --commit ${{ github.sha }} --workflow=ci.yml --json status,conclusion --jq '.[0]')
             RUNNING=$(echo "$STATUS" | jq -r '.status')
             CONCLUSION=$(echo "$STATUS" | jq -r '.conclusion')
-            
+
             if [ "$RUNNING" = "completed" ]; then
               if [ "$CONCLUSION" = "success" ]; then
                 echo "CI passed!"
@@ -36,14 +40,168 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+  build:
+    needs: verify-ci
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            npm-artifact: npm-darwin-x64
+            asset-name: nosecrets-x86_64-apple-darwin.tar.gz
+            binary-name: nosecrets
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            npm-artifact: npm-darwin-arm64
+            asset-name: nosecrets-aarch64-apple-darwin.tar.gz
+            binary-name: nosecrets
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            npm-artifact: npm-linux-x64
+            asset-name: nosecrets-x86_64-unknown-linux-gnu.tar.gz
+            binary-name: nosecrets
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            npm-artifact: npm-linux-arm64
+            asset-name: nosecrets-aarch64-unknown-linux-gnu.tar.gz
+            binary-name: nosecrets
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            npm-artifact: npm-win32-x64
+            asset-name: nosecrets-x86_64-pc-windows-msvc.zip
+            binary-name: nosecrets.exe
 
-      - name: Trigger release in nosecrets-packages
-        uses: peter-evans/repository-dispatch@v3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          token: ${{ secrets.RELEASE_TOKEN }}
-          repository: casoon/nosecrets-packages
-          event-type: trigger-release
-          client-payload: '{"version": "${{ steps.version.outputs.version }}"}'
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cross
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: cargo install cross
+
+      - name: Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: Package Unix release asset
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.binary-name }} .
+          tar -czf ${{ matrix.asset-name }} ${{ matrix.binary-name }}
+
+      - name: Package Windows release asset
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.binary-name }} .
+          7z a ${{ matrix.asset-name }} ${{ matrix.binary-name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: ${{ matrix.asset-name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.npm-artifact }}
+          path: target/${{ matrix.target }}/release/${{ matrix.binary-name }}
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+
+  npm:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download npm binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: packages/npm/vendor
+          pattern: npm-*
+
+      - name: Make Unix binaries executable
+        shell: bash
+        run: |
+          chmod +x packages/npm/vendor/npm-darwin-arm64/nosecrets
+          chmod +x packages/npm/vendor/npm-darwin-x64/nosecrets
+          chmod +x packages/npm/vendor/npm-linux-arm64/nosecrets
+          chmod +x packages/npm/vendor/npm-linux-x64/nosecrets
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Set package version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          cd packages/npm
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Publish npm package
+        working-directory: packages/npm
+        run: npm publish --provenance --access public
+
+  crates:
+    needs: verify-ci
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish -p nosecrets-rules
+          sleep 15
+          cargo publish -p nosecrets-filter
+          sleep 15
+          cargo publish -p nosecrets-report
+          sleep 15
+          cargo publish -p nosecrets-core
+          sleep 15
+          cargo publish -p nosecrets-cli

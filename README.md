@@ -9,6 +9,7 @@ Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, an
 - Pre-commit focus (no history scanning)
 - Offline only, no API calls
 - Fast scanning (regex + validation + prefilter)
+- High-entropy detection for unknown secrets
 - Minimal configuration
 
 ## Install
@@ -19,11 +20,19 @@ Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, an
 npm install -g @casoon/nosecrets
 ```
 
+The npm package ships the prebuilt CLI binaries for supported macOS, Linux, and Windows targets and selects the right one at runtime.
+
 ### Homebrew (macOS)
 
 Coming soon once nosecrets has been battle-tested.
 
-### From source (Rust)
+### Cargo (Rust)
+
+```
+cargo install nosecrets-cli
+```
+
+### From source
 
 ```
 cargo install --path crates/nosecrets-cli
@@ -74,6 +83,35 @@ values = [
 ]
 ```
 
+### High-entropy detection
+
+nosecrets includes an entropy-based detection layer that catches unknown or proprietary secrets that don't match any known regex rule. It is enabled by default and can be configured:
+
+```toml
+[entropy]
+enabled = true
+min_length = 20
+threshold = 4.2
+require_context = true
+
+[entropy.allow]
+patterns = [
+  "^[a-f0-9]{32,}$",
+  "^[A-F0-9]{32,}$",
+]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Enable or disable entropy detection |
+| `min_length` | `20` | Minimum token length to consider |
+| `threshold` | `4.2` | Shannon entropy threshold (bits per char) |
+| `require_context` | `true` | Only flag tokens near secret-related variable names (`secret`, `token`, `key`, `auth`, `password`, etc.) |
+
+When `require_context` is `true` (default), only tokens found near variable names like `SECRET_KEY`, `AUTH_TOKEN`, `password`, etc. are flagged. This dramatically reduces false positives.
+
+Entropy findings use rule ID `high-entropy-string` with severity `medium` and work with all existing filtering mechanisms (`.nosecretsignore`, inline ignores, allowlists, fingerprints).
+
 ### .nosecretsignore
 
 ```
@@ -100,6 +138,7 @@ Rules are shipped in TOML files under `rules/`:
 - `rules/database.toml` (Postgres/MySQL/Mongo/Redis, JDBC passwords)
 - `rules/payment.toml` (Stripe)
 - `rules/generic.toml` (private keys, generic secrets, passwords)
+- High-entropy detection (unknown tokens, proprietary secrets)
 
 ### Help improve the rules
 
@@ -132,6 +171,17 @@ Example `.pre-commit-hooks.yaml` entry:
 cargo test
 cargo run -p nosecrets-cli -- scan --staged
 ```
+
+## Release
+
+Create and push a version tag from this repository:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The tag workflow waits for CI, builds release binaries, publishes the GitHub release assets, publishes `@casoon/nosecrets` to npm, and publishes all crates to crates.io.
 
 ## License
 

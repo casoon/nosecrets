@@ -1,3 +1,5 @@
+pub mod entropy;
+
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,14 +12,16 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use rayon::prelude::*;
 use regex::Regex;
 
-use nosecrets_filter::{normalize_path, Filter};
+use nosecrets_filter::{normalize_path, EntropyConfig, Filter};
 use nosecrets_report::{fingerprint_secret, mask_secret, Finding};
-use nosecrets_rules::{Rule, RuleAllow, RulePaths, RuleValidate};
+use nosecrets_rules::{Rule, RuleAllow, RulePaths, RuleValidate, Severity};
 
 pub struct Detector {
     rules: Arc<Vec<CompiledRule>>,
     prefilter: Prefilter,
     filter: Arc<Filter>,
+    entropy_config: EntropyConfig,
+    entropy_allow_patterns: Vec<Regex>,
 }
 
 struct CompiledRule {
@@ -38,6 +42,14 @@ struct Prefilter {
 
 impl Detector {
     pub fn new(rules: Vec<Rule>, filter: Filter) -> Result<Self> {
+        Self::with_entropy(rules, filter, EntropyConfig::default())
+    }
+
+    pub fn with_entropy(
+        rules: Vec<Rule>,
+        filter: Filter,
+        entropy_config: EntropyConfig,
+    ) -> Result<Self> {
         let mut compiled = Vec::with_capacity(rules.len());
         for rule in rules {
             let regex = Regex::new(&rule.pattern)
@@ -57,10 +69,21 @@ impl Detector {
         }
         let compiled = Arc::new(compiled);
         let prefilter = Prefilter::new(&compiled);
+
+        let mut entropy_allow = Vec::new();
+        for pattern in &entropy_config.allow.patterns {
+            entropy_allow.push(
+                Regex::new(pattern)
+                    .with_context(|| format!("invalid entropy allow pattern {pattern}"))?,
+            );
+        }
+
         Ok(Self {
             rules: compiled,
             prefilter,
             filter: Arc::new(filter),
+            entropy_config,
+            entropy_allow_patterns: entropy_allow,
         })
     }
 
@@ -91,6 +114,10 @@ impl Detector {
         let line_starts = build_line_starts(&text);
         let mut findings = Vec::new();
 
+        // Collect byte spans covered by regex findings for deduplication
+        let mut regex_spans: Vec<(usize, usize)> = Vec::new();
+
+        // Phase 1: Regex-based detection
         let candidate_rules = self.prefilter.candidates(&text);
         for &rule_idx in &candidate_rules {
             let rule = &self.rules[rule_idx];
@@ -117,6 +144,7 @@ impl Detector {
                 if self.filter.is_fingerprint_ignored(&fingerprint, rel_path) {
                     continue;
                 }
+                regex_spans.push((matched.start(), matched.end()));
                 findings.push(Finding {
                     path: normalize_path(rel_path),
                     line,
@@ -129,6 +157,45 @@ impl Detector {
                 });
             }
         }
+
+        // Phase 2: Entropy-based detection
+        if self.entropy_config.enabled {
+            let entropy_matches =
+                entropy::detect_entropy(&text, &self.entropy_config, &self.entropy_allow_patterns);
+            for em in entropy_matches {
+                let em_end = em.byte_offset + em.text.len();
+                // Deduplicate: skip if overlapping with any regex span
+                let overlaps = regex_spans
+                    .iter()
+                    .any(|&(start, end)| em.byte_offset < end && em_end > start);
+                if overlaps {
+                    continue;
+                }
+                let (line, column) = line_col(&line_starts, em.byte_offset);
+                let line_text = line_slice(&text, &line_starts, line);
+                if Filter::is_inline_ignored(line_text) {
+                    continue;
+                }
+                if self.filter.is_value_allowed(&em.text) {
+                    continue;
+                }
+                let fingerprint = fingerprint_secret(&em.text);
+                if self.filter.is_fingerprint_ignored(&fingerprint, rel_path) {
+                    continue;
+                }
+                findings.push(Finding {
+                    path: normalize_path(rel_path),
+                    line,
+                    column,
+                    rule_id: "high-entropy-string".to_string(),
+                    rule_name: "High Entropy String".to_string(),
+                    severity: Severity::Medium,
+                    fingerprint,
+                    preview: mask_secret(&em.text),
+                });
+            }
+        }
+
         Ok(findings)
     }
 }

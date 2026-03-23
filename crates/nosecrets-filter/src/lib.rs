@@ -12,6 +12,8 @@ pub struct Config {
     pub ignore: IgnoreConfig,
     #[serde(default)]
     pub allow: AllowConfig,
+    #[serde(default)]
+    pub entropy: EntropyConfig,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -26,6 +28,54 @@ pub struct AllowConfig {
     pub patterns: Vec<String>,
     #[serde(default)]
     pub values: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct EntropyConfig {
+    #[serde(default = "entropy_default_enabled")]
+    pub enabled: bool,
+    #[serde(default = "entropy_default_min_length")]
+    pub min_length: usize,
+    #[serde(default = "entropy_default_threshold")]
+    pub threshold: f64,
+    #[serde(default = "entropy_default_require_context")]
+    pub require_context: bool,
+    #[serde(default)]
+    pub allow: EntropyAllowConfig,
+}
+
+impl Default for EntropyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: entropy_default_enabled(),
+            min_length: entropy_default_min_length(),
+            threshold: entropy_default_threshold(),
+            require_context: entropy_default_require_context(),
+            allow: EntropyAllowConfig::default(),
+        }
+    }
+}
+
+fn entropy_default_enabled() -> bool {
+    true
+}
+
+fn entropy_default_min_length() -> usize {
+    20
+}
+
+fn entropy_default_threshold() -> f64 {
+    4.2
+}
+
+fn entropy_default_require_context() -> bool {
+    true
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
+pub struct EntropyAllowConfig {
+    #[serde(default)]
+    pub patterns: Vec<String>,
 }
 
 #[derive(Debug)]

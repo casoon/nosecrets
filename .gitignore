@@ -15,3 +15,8 @@ Thumbs.db
 
 # Test artifacts
 *.log
+
+# npm packaging artifacts
+*.tgz
+packages/npm/vendor/*
+!packages/npm/vendor/README.md

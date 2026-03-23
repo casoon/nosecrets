@@ -75,10 +75,14 @@ fn run_scan(args: ScanArgs) -> Result<()> {
     let root = repo_root.clone().unwrap_or(cwd);
 
     let config = Config::load_from_dir(&root)?;
+    let entropy_config = config
+        .as_ref()
+        .map(|c| c.entropy.clone())
+        .unwrap_or_default();
     let ignore_entries = load_ignore_file(&root.join(".nosecretsignore"))?;
     let filter = Filter::from_config(config, ignore_entries)?;
     let rules = load_builtin_rules()?;
-    let detector = Detector::new(rules, filter)?;
+    let detector = Detector::with_entropy(rules, filter, entropy_config)?;
 
     let files = if args.staged {
         let Some(repo_root) = repo_root else {

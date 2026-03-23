@@ -5,7 +5,7 @@
 //! GitHub's push protection, even with obviously fake tokens.
 
 use nosecrets_core::Detector;
-use nosecrets_filter::Filter;
+use nosecrets_filter::{EntropyConfig, Filter};
 use nosecrets_rules::load_builtin_rules;
 use std::fs;
 use tempfile::tempdir;
@@ -14,6 +14,12 @@ fn create_detector() -> Detector {
     let rules = load_builtin_rules().expect("failed to load rules");
     let filter = Filter::from_config(None, Vec::new()).expect("failed to create filter");
     Detector::new(rules, filter).expect("failed to create detector")
+}
+
+fn create_detector_with_entropy(config: EntropyConfig) -> Detector {
+    let rules = load_builtin_rules().expect("failed to load rules");
+    let filter = Filter::from_config(None, Vec::new()).expect("failed to create filter");
+    Detector::with_entropy(rules, filter, config).expect("failed to create detector")
 }
 
 fn scan_content(detector: &Detector, content: &str) -> Vec<String> {
@@ -212,3 +218,173 @@ fn detects_twilio_auth_token() {
 // - detects_twilio_api_key (SK...)
 //
 // These rules are tested manually and work correctly.
+
+// ============================================================================
+// High Entropy Detection Tests
+// ============================================================================
+
+#[test]
+fn entropy_detects_unknown_token_in_env() {
+    let detector = create_detector_with_entropy(EntropyConfig::default());
+    let content = r#"SECRET_TOKEN="xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        rule_ids.contains(&"high-entropy-string".to_string()),
+        "should detect unknown high-entropy token, got {:?}",
+        rule_ids
+    );
+}
+
+#[test]
+fn entropy_detects_bearer_like_token() {
+    let detector = create_detector_with_entropy(EntropyConfig::default());
+    let content = r#"Authorization: Bearer xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g"#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        rule_ids.contains(&"high-entropy-string".to_string()),
+        "should detect bearer-like high-entropy token, got {:?}",
+        rule_ids
+    );
+}
+
+#[test]
+fn entropy_detects_proprietary_token_in_env() {
+    let detector = create_detector_with_entropy(EntropyConfig::default());
+    // Use a custom variable name that won't match generic-api-key regex
+    let content = r#"MY_SECRET_CREDENTIAL="Rn4xZ8cW2qL7vM5bJ9yT3fK6gH1dP0sE""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        rule_ids.contains(&"high-entropy-string".to_string()),
+        "should detect proprietary token, got {:?}",
+        rule_ids
+    );
+}
+
+#[test]
+fn entropy_skips_uuid() {
+    let detector = create_detector_with_entropy(EntropyConfig {
+        require_context: false,
+        ..EntropyConfig::default()
+    });
+    let content = r#"ID = "550e8400-e29b-41d4-a716-446655440000""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should not flag UUIDs"
+    );
+}
+
+#[test]
+fn entropy_skips_normal_hash() {
+    let detector = create_detector_with_entropy(EntropyConfig {
+        require_context: false,
+        ..EntropyConfig::default()
+    });
+    // Pure hex string without secret context
+    let content = r#"CHECKSUM = "a3f2b8c91d4e6f7890abcdef12345678""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should not flag pure hex hash without secret context"
+    );
+}
+
+#[test]
+fn entropy_skips_placeholder() {
+    let detector = create_detector_with_entropy(EntropyConfig::default());
+    let content = r#"SECRET_KEY="your_token_here_please_replace""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should not flag placeholder values"
+    );
+}
+
+#[test]
+fn entropy_skips_url_without_creds() {
+    let detector = create_detector_with_entropy(EntropyConfig {
+        require_context: false,
+        ..EntropyConfig::default()
+    });
+    let content = r#"ENDPOINT = "https://api.example.com/v1/long/path/resource""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should not flag URLs without credentials"
+    );
+}
+
+#[test]
+fn entropy_skips_normal_english_text() {
+    let detector = create_detector_with_entropy(EntropyConfig {
+        require_context: false,
+        ..EntropyConfig::default()
+    });
+    let content = r#"DESCRIPTION = "This is a normal English sentence that should not be flagged""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should not flag normal text"
+    );
+}
+
+#[test]
+fn entropy_requires_context_by_default() {
+    let detector = create_detector_with_entropy(EntropyConfig::default());
+    // High entropy but no secret-related context
+    let content = r#"RANDOM_FIELD = "xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should require context by default"
+    );
+}
+
+#[test]
+fn entropy_no_duplicate_with_known_rule() {
+    let detector = create_detector_with_entropy(EntropyConfig {
+        require_context: false,
+        ..EntropyConfig::default()
+    });
+    // AWS secret key - should be caught by regex rule, not duplicated by entropy
+    let content = r#"AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY""#;
+    let rule_ids = scan_content(&detector, content);
+    let entropy_count = rule_ids
+        .iter()
+        .filter(|id| id.as_str() == "high-entropy-string")
+        .count();
+    assert_eq!(
+        entropy_count, 0,
+        "should not duplicate findings from regex rules"
+    );
+}
+
+#[test]
+fn entropy_disabled_produces_no_findings() {
+    let detector = create_detector_with_entropy(EntropyConfig {
+        enabled: false,
+        ..EntropyConfig::default()
+    });
+    let content = r#"SECRET_TOKEN="xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should produce no entropy findings when disabled"
+    );
+}
+
+#[test]
+fn entropy_respects_min_length() {
+    let detector = create_detector_with_entropy(EntropyConfig {
+        min_length: 40,
+        require_context: false,
+        ..EntropyConfig::default()
+    });
+    // 32 chars - below min_length of 40
+    let content = r#"TOKEN = "xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        !rule_ids.contains(&"high-entropy-string".to_string()),
+        "should respect min_length setting"
+    );
+}

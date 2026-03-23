@@ -10,6 +10,7 @@ Fast, offline secret scanner for Git pre-commit hooks. Designed to be simple, fa
 - Pre-commit focus (no history scanning)
 - Offline only, no API calls
 - Fast scanning (regex + validation + prefilter)
+- High-entropy detection for unknown secrets
 - Minimal configuration
 
 ## Install
@@ -25,6 +26,8 @@ cargo install nosecrets-cli
 ```bash
 npm install -g @casoon/nosecrets
 ```
+
+The npm package is published from the main `nosecrets` repository and bundles prebuilt binaries for supported platforms.
 
 ## Usage
 
@@ -97,6 +100,19 @@ Detects secrets from:
 - **Database**: PostgreSQL, MySQL, MongoDB, Redis
 - **Payment**: Stripe
 - **Generic**: Private keys, API keys, passwords
+- **High-entropy**: Unknown tokens, proprietary secrets (Shannon entropy analysis)
+
+### High-entropy Detection
+
+nosecrets detects unknown secrets through entropy analysis. Enabled by default, configurable via `.nosecrets.toml`:
+
+```toml
+[entropy]
+enabled = true
+min_length = 20
+threshold = 4.2
+require_context = true
+```
 
 ## Pre-commit Integration
 

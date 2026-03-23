@@ -1,0 +1,32 @@
+{
+  "name": "@casoon/nosecrets",
+  "version": "0.2.0",
+  "description": "Fast, offline secret scanner for Git pre-commit hooks",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/casoon/nosecrets"
+  },
+  "homepage": "https://github.com/casoon/nosecrets",
+  "bin": {
+    "nosecrets": "bin/nosecrets"
+  },
+  "files": [
+    "bin",
+    "vendor"
+  ],
+  "keywords": [
+    "security",
+    "secrets",
+    "git",
+    "pre-commit",
+    "scanner",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

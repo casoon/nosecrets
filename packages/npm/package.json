@@ -1,6 +1,6 @@
 {
   "name": "@casoon/nosecrets",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Fast, offline secret scanner for Git pre-commit hooks",
   "license": "MIT",
   "repository": {

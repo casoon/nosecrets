@@ -152,6 +152,10 @@ The built-in rules are a starting point, but this tool becomes more valuable as 
 
 Open an issue or pull request at [github.com/casoon/nosecrets](https://github.com/casoon/nosecrets).
 
+## False positives
+
+nosecrets can produce false positives — especially the entropy-based detection. If you encounter one, please [open an issue](https://github.com/casoon/nosecrets/issues) with an example of the flagged line so we can improve the detection. You can always suppress individual findings with inline ignores or fingerprints in the meantime.
+
 ## Pre-commit integration
 
 Example `.pre-commit-hooks.yaml` entry:
@@ -178,20 +182,11 @@ cargo run -p nosecrets-cli -- scan --staged
 Create and push a version tag from this repository:
 
 ```bash
-git tag v0.3.1
-git push origin v0.3.1
+git tag v0.3.5
+git push origin v0.3.5
 ```
 
-The tag workflow waits for CI, builds release binaries, publishes the GitHub release assets, and publishes all crates to crates.io.
-
-The npm package is published manually from `packages/npm` after the release assets exist:
-
-```bash
-cd packages/npm
-npm publish
-```
-
-`prepack` automatically downloads the matching GitHub release assets for the current package version and populates `vendor/` before publishing.
+The tag workflow waits for CI, builds release binaries, publishes the GitHub release, publishes all crates to crates.io, and publishes the npm package with provenance.
 
 ## License
 

@@ -666,7 +666,10 @@ URL="https://example.com/api/v1"
         let content = r#"prefix 法法法法法法法法法法法法法法法法法法法法 SECRET_TOKEN="xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g""#;
         let config = EntropyConfig::default();
         let result = std::panic::catch_unwind(|| detect_entropy(content, &config, &[]));
-        assert!(result.is_ok(), "unicode context extraction should not panic");
+        assert!(
+            result.is_ok(),
+            "unicode context extraction should not panic"
+        );
         let matches = result.unwrap();
         assert!(
             !matches.is_empty(),
@@ -674,4 +677,3 @@ URL="https://example.com/api/v1"
         );
     }
 }
-

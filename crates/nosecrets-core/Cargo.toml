@@ -19,9 +19,9 @@ rayon.workspace = true
 walkdir.workspace = true
 gix.workspace = true
 globset.workspace = true
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.1" }
-nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.1" }
-nosecrets-report = { path = "../nosecrets-report", version = "0.3.1" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.2" }
+nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.2" }
+nosecrets-report = { path = "../nosecrets-report", version = "0.3.2" }
 
 [dev-dependencies]
 tempfile.workspace = true

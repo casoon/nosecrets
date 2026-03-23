@@ -16,10 +16,10 @@ anyhow.workspace = true
 clap.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-nosecrets-core = { path = "../nosecrets-core", version = "0.3.1" }
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.1" }
-nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.1" }
-nosecrets-report = { path = "../nosecrets-report", version = "0.3.1" }
+nosecrets-core = { path = "../nosecrets-core", version = "0.3.2" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.2" }
+nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.2" }
+nosecrets-report = { path = "../nosecrets-report", version = "0.3.2" }
 
 [[bin]]
 name = "nosecrets"

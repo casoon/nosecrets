@@ -184,34 +184,6 @@ git push origin v0.2.0
 
 The tag workflow waits for CI, builds release binaries, publishes the GitHub release assets, and publishes all crates to crates.io.
 
-### npm publish (manual)
-
-After the tag workflow has built the binaries and created the GitHub release, download the artifacts and publish manually:
-
-```bash
-# Download the release binaries into the vendor directory
-cd packages/npm
-mkdir -p vendor/npm-darwin-arm64 vendor/npm-darwin-x64 vendor/npm-linux-arm64 vendor/npm-linux-x64 vendor/npm-win32-x64
-
-# Download from the GitHub release
-gh release download v0.2.0 -p 'nosecrets-aarch64-apple-darwin.tar.gz' -D /tmp/nosecrets-release
-gh release download v0.2.0 -p 'nosecrets-x86_64-apple-darwin.tar.gz' -D /tmp/nosecrets-release
-gh release download v0.2.0 -p 'nosecrets-aarch64-unknown-linux-gnu.tar.gz' -D /tmp/nosecrets-release
-gh release download v0.2.0 -p 'nosecrets-x86_64-unknown-linux-gnu.tar.gz' -D /tmp/nosecrets-release
-gh release download v0.2.0 -p 'nosecrets-x86_64-pc-windows-msvc.zip' -D /tmp/nosecrets-release
-
-# Extract into vendor directories
-tar -xzf /tmp/nosecrets-release/nosecrets-aarch64-apple-darwin.tar.gz -C vendor/npm-darwin-arm64
-tar -xzf /tmp/nosecrets-release/nosecrets-x86_64-apple-darwin.tar.gz -C vendor/npm-darwin-x64
-tar -xzf /tmp/nosecrets-release/nosecrets-aarch64-unknown-linux-gnu.tar.gz -C vendor/npm-linux-arm64
-tar -xzf /tmp/nosecrets-release/nosecrets-x86_64-unknown-linux-gnu.tar.gz -C vendor/npm-linux-x64
-cd /tmp/nosecrets-release && unzip nosecrets-x86_64-pc-windows-msvc.zip -d /path/to/packages/npm/vendor/npm-win32-x64
-
-# Publish
-cd packages/npm
-npm publish --access public
-```
-
 ## License
 
 MIT

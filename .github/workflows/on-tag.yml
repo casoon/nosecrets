@@ -148,6 +148,8 @@ jobs:
       - name: Publish npm package
         working-directory: packages/npm
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
   crates:
     needs: verify-ci

@@ -18,4 +18,4 @@ sha2.workspace = true
 hex.workspace = true
 console.workspace = true
 thiserror.workspace = true
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.3" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.4" }

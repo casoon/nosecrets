@@ -1,6 +1,6 @@
 {
   "name": "@casoon/nosecrets",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Fast, offline secret scanner for Git pre-commit hooks",
   "license": "MIT",
   "repository": {
@@ -28,5 +28,9 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "prepare-release": "node scripts/prepare-release.mjs",
+    "prepack": "npm run prepare-release"
   }
 }

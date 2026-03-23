@@ -178,11 +178,20 @@ cargo run -p nosecrets-cli -- scan --staged
 Create and push a version tag from this repository:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 The tag workflow waits for CI, builds release binaries, publishes the GitHub release assets, and publishes all crates to crates.io.
+
+The npm package is published manually from `packages/npm` after the release assets exist:
+
+```bash
+cd packages/npm
+npm publish
+```
+
+`prepack` automatically downloads the matching GitHub release assets for the current package version and populates `vendor/` before publishing.
 
 ## License
 

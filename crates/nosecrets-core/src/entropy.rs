@@ -241,8 +241,12 @@ fn add_subtokens(
     candidates: &mut Vec<EntropyCandidate>,
     seen: &mut std::collections::HashSet<usize>,
 ) {
-    // First, add the whole value if it qualifies
-    if value.len() >= min_length && !seen.contains(&base_offset) {
+    // First, add the whole value if it qualifies. Skip whitespace-containing values
+    // because prose, Markdown, and config descriptions are too noisy for entropy.
+    if value.len() >= min_length
+        && !value.chars().any(char::is_whitespace)
+        && !seen.contains(&base_offset)
+    {
         // Determine context from surrounding text
         let context = extract_context_from_surroundings(full_text, base_offset);
         seen.insert(base_offset);
@@ -421,9 +425,13 @@ fn passes_guards(
     if looks_like_import(text) {
         return false;
     }
-
     // CSS class guard
     if looks_like_css(text) {
+        return false;
+    }
+
+    // Template/workflow expression guard
+    if looks_like_template_expression(text) {
         return false;
     }
 
@@ -509,6 +517,16 @@ fn looks_like_css(s: &str) -> bool {
     dashes >= 3
         && s.chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+}
+
+fn looks_like_template_expression(s: &str) -> bool {
+    s.contains("${{")
+        || s.contains("{{")
+        || s.contains("}}")
+        || s.contains("hashFiles(")
+        || s.contains("always()")
+        || s.contains("success()")
+        || s.contains("failure()")
 }
 
 /// Count character groups present: lowercase, uppercase, digits, special.
@@ -674,6 +692,28 @@ URL="https://example.com/api/v1"
         assert!(
             !matches.is_empty(),
             "should still detect the high-entropy token with unicode nearby"
+        );
+    }
+    #[test]
+    fn test_detect_entropy_skips_github_actions_expression() {
+        let content = "key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}";
+        let config = EntropyConfig::default();
+        let matches = detect_entropy(content, &config, &[]);
+        assert!(
+            matches.is_empty(),
+            "should not flag GitHub Actions expressions"
+        );
+    }
+
+    #[test]
+    fn test_detect_entropy_skips_prose_values_with_spaces() {
+        let content =
+            "Brand mapping: recommend_token_mapping generates CSS tokens from your brand colors";
+        let config = EntropyConfig::default();
+        let matches = detect_entropy(content, &config, &[]);
+        assert!(
+            matches.is_empty(),
+            "should not flag prose values as high entropy"
         );
     }
 }

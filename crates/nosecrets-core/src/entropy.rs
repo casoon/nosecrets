@@ -288,10 +288,30 @@ fn add_subtokens(
 }
 
 /// Look at surrounding text to find a context keyword (variable name, header, etc.)
+fn previous_char_boundary(text: &str, mut index: usize) -> usize {
+    index = index.min(text.len());
+    while index > 0 && !text.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+fn lookback_char_boundary(text: &str, offset: usize, char_count: usize) -> usize {
+    let mut index = previous_char_boundary(text, offset);
+    for _ in 0..char_count {
+        if index == 0 {
+            break;
+        }
+        index = previous_char_boundary(text, index - 1);
+    }
+    index
+}
+
 fn extract_context_from_surroundings(text: &str, offset: usize) -> Option<String> {
-    // Look backwards up to 120 chars for context
-    let lookback = offset.saturating_sub(120);
-    let before = &text[lookback..offset];
+    let safe_offset = previous_char_boundary(text, offset);
+    // Look backwards up to 120 chars for context.
+    let lookback = lookback_char_boundary(text, safe_offset, 120);
+    let before = &text[lookback..safe_offset];
     // Find the start of the current line
     let line_start = before.rfind('\n').map(|p| p + 1).unwrap_or(0);
     let line_prefix = &before[line_start..];
@@ -630,7 +650,6 @@ URL="https://example.com/api/v1"
             matches.iter().map(|m| &m.text).collect::<Vec<_>>()
         );
     }
-
     #[test]
     fn test_detect_entropy_skips_uuid() {
         let content = r#"ID = "550e8400-e29b-41d4-a716-446655440000""#;
@@ -641,4 +660,18 @@ URL="https://example.com/api/v1"
         let matches = detect_entropy(content, &config, &[]);
         assert!(matches.is_empty(), "should not flag UUIDs");
     }
+
+    #[test]
+    fn test_extract_context_handles_unicode_boundaries() {
+        let content = r#"prefix 法法法法法法法法法法法法法法法法法法法法 SECRET_TOKEN="xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g""#;
+        let config = EntropyConfig::default();
+        let result = std::panic::catch_unwind(|| detect_entropy(content, &config, &[]));
+        assert!(result.is_ok(), "unicode context extraction should not panic");
+        let matches = result.unwrap();
+        assert!(
+            !matches.is_empty(),
+            "should still detect the high-entropy token with unicode nearby"
+        );
+    }
 }
+

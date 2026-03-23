@@ -6,6 +6,23 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+const DEFAULT_IGNORE_PATHS: &[&str] = &[
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/.pnpm-store/**",
+    "**/.yarn/**",
+    "**/.astro/**",
+    "**/.wrangler/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/.svelte-kit/**",
+    "**/coverage/**",
+    "**/target/**",
+    "**/playwright-report/**",
+    "**/test-results/**",
+];
+
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct Config {
     #[serde(default)]
@@ -182,11 +199,17 @@ impl Filter {
         ignore_entries: Vec<IgnoreEntry>,
     ) -> Result<Self, FilterError> {
         let config = config.unwrap_or_default();
-        let ignore_paths = if config.ignore.paths.is_empty() {
+        let mut all_ignore_paths: Vec<String> = DEFAULT_IGNORE_PATHS
+            .iter()
+            .map(|pattern| (*pattern).to_string())
+            .collect();
+        all_ignore_paths.extend(config.ignore.paths.iter().cloned());
+
+        let ignore_paths = if all_ignore_paths.is_empty() {
             None
         } else {
             let mut builder = GlobSetBuilder::new();
-            for pattern in &config.ignore.paths {
+            for pattern in &all_ignore_paths {
                 let normalized = normalize_glob_pattern(pattern);
                 let glob = Glob::new(&normalized).map_err(|error| FilterError::Glob {
                     pattern: normalized.clone(),
@@ -203,7 +226,7 @@ impl Filter {
         let mut allow_patterns = Vec::new();
         for pattern in &config.allow.patterns {
             let regex = Regex::new(pattern).map_err(|error| FilterError::Regex {
-                pattern: pattern.clone(),
+                pattern: pattern.to_string(),
                 error,
             })?;
             allow_patterns.push(regex);
@@ -310,5 +333,17 @@ mod tests {
         ));
         assert!(Filter::is_inline_ignored("// @nsi test"));
         assert!(!Filter::is_inline_ignored("no ignore here"));
+    }
+
+    #[test]
+    fn default_ignore_paths_skip_common_build_and_dependency_dirs() {
+        let filter = Filter::from_config(None, Vec::new()).expect("build filter");
+        assert!(filter.is_path_ignored(Path::new("node_modules/pkg/index.js")));
+        assert!(filter.is_path_ignored(Path::new(".wrangler/tmp/worker.js")));
+        assert!(filter.is_path_ignored(Path::new("dist/client/index.html")));
+        assert!(filter.is_path_ignored(Path::new(".astro/types.d.ts")));
+        assert!(filter.is_path_ignored(Path::new("playwright-report/index.html")));
+        assert!(filter.is_path_ignored(Path::new("test-results/run/output.json")));
+        assert!(!filter.is_path_ignored(Path::new("src/pages/index.astro")));
     }
 }

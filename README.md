@@ -182,8 +182,8 @@ cargo run -p nosecrets-cli -- scan --staged
 Create and push a version tag from this repository:
 
 ```bash
-git tag v0.3.5
-git push origin v0.3.5
+git tag v0.3.6
+git push origin v0.3.6
 ```
 
 The tag workflow waits for CI, builds release binaries, publishes the GitHub release, publishes all crates to crates.io, and publishes the npm package with provenance.

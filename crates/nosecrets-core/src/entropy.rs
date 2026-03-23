@@ -435,6 +435,11 @@ fn passes_guards(
         return false;
     }
 
+    // Code expression guard
+    if looks_like_code_expression(text) {
+        return false;
+    }
+
     // Character diversity guard: require at least 3 char groups
     if char_group_count(text) < 3 {
         return false;
@@ -527,6 +532,14 @@ fn looks_like_template_expression(s: &str) -> bool {
         || s.contains("always()")
         || s.contains("success()")
         || s.contains("failure()")
+}
+
+fn looks_like_code_expression(s: &str) -> bool {
+    let has_call = s.contains('(') && s.contains(')');
+    let has_chain = s.contains('.');
+    let has_indexing = s.contains('[') || s.contains(']');
+    let has_arrows = s.contains("=>") || s.contains("::");
+    has_call && (has_chain || has_indexing) || has_arrows
 }
 
 /// Count character groups present: lowercase, uppercase, digits, special.

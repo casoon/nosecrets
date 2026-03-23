@@ -107,11 +107,20 @@ pub fn mask_secret(secret: &str) -> String {
     if secret.is_empty() {
         return "".to_string();
     }
-    if secret.len() <= 8 {
-        return "*".repeat(secret.len());
+    let chars: Vec<char> = secret.chars().collect();
+    if chars.len() <= 8 {
+        return "*".repeat(chars.len());
     }
-    let start = &secret[..4];
-    let end = &secret[secret.len() - 4..];
+    let start: String = chars.iter().take(4).collect();
+    let end: String = chars
+        .iter()
+        .rev()
+        .take(4)
+        .copied()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
     format!("{}...{}", start, end)
 }
 
@@ -151,6 +160,12 @@ mod tests {
         assert_eq!(mask_secret(""), "");
         assert_eq!(mask_secret("short"), "*****");
         assert_eq!(mask_secret("longsecret"), "long...cret");
+    }
+
+    #[test]
+    fn mask_secret_handles_unicode() {
+        assert_eq!(mask_secret("абвгдежзи"), "абвг...ежзи");
+        assert_eq!(mask_secret("„quoted-secret-სიმბოლოები"), "„quo...ოები");
     }
 
     #[test]

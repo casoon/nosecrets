@@ -15,28 +15,28 @@ Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, an
 
 ## Install
 
-### npm (recommended)
+### curl (macOS and Linux)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh
+```
+
+Installs the prebuilt binary to `/usr/local/bin`. Override the target directory:
+
+```sh
+NOSECRETS_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh
+```
+
+### npm
 
 ```
 npm install -g @casoon/nosecrets
 ```
 
-The npm package ships the prebuilt CLI binaries for supported macOS, Linux, and Windows targets and selects the right one at runtime.
-
-### Homebrew (macOS)
-
-Coming soon once nosecrets has been battle-tested.
-
 ### Cargo (Rust)
 
 ```
 cargo install nosecrets-cli
-```
-
-### From source
-
-```
-cargo install --path crates/nosecrets-cli
 ```
 
 ## Usage

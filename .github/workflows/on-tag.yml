@@ -167,12 +167,12 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          cargo publish -p nosecrets-rules
+          cargo publish -p nosecrets-rules || true
           sleep 15
-          cargo publish -p nosecrets-filter
+          cargo publish -p nosecrets-filter || true
           sleep 15
-          cargo publish -p nosecrets-report
+          cargo publish -p nosecrets-report || true
           sleep 15
-          cargo publish -p nosecrets-core
+          cargo publish -p nosecrets-core || true
           sleep 15
           cargo publish -p nosecrets-cli

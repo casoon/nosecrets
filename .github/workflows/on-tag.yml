@@ -175,4 +175,4 @@ jobs:
           sleep 15
           cargo publish -p nosecrets-core || true
           sleep 15
-          cargo publish -p nosecrets-cli
+          cargo publish -p nosecrets-cli || true

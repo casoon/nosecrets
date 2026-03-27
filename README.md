@@ -150,7 +150,7 @@ The built-in rules are a starting point, but this tool becomes more valuable as 
 - Improvements to existing patterns (better regex, fewer false positives)
 - Bug reports for missed secrets or false positives
 
-Open an issue or pull request at [github.com/casoon/nosecrets](https://github.com/casoon/nosecrets).
+Open an issue or pull request at [github.com/casoon/nosecrets](https://github.com/casoon/nosecrets). More information at [nosecrets.casoon.dev](https://nosecrets.casoon.dev).
 
 ## False positives
 

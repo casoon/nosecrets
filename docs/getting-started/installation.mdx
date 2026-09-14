@@ -1,0 +1,55 @@
+---
+title: Installation
+description: Install the nosecrets CLI from a verified release archive, npm or crates.io.
+order: 1
+---
+
+<Tabs
+  label="Installation method"
+  tabs={[
+    { id: 'curl', label: 'curl' },
+    { id: 'npm', label: 'npm' },
+    { id: 'cargo', label: 'Cargo' },
+  ]}
+>
+<div slot="curl">
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh
+```
+
+</div>
+<div slot="npm">
+
+```sh
+npm install -g @casoon/nosecrets
+```
+
+</div>
+<div slot="cargo">
+
+```sh
+cargo install nosecrets-cli
+```
+
+</div>
+</Tabs>
+
+<Callout>
+  The release installer verifies the downloaded archive against the release SHA-256 manifest.
+  Set `NOSECRETS_INSTALL_DIR` to install somewhere other than `/usr/local/bin`.
+</Callout>
+
+## Requirements
+
+Prebuilt release binaries are available for Apple Silicon macOS, x64 and arm64 Linux, and x64
+Windows. Intel macOS users should install through Cargo. Building from source requires Rust 1.85
+or newer. The npm wrapper requires Node.js 16 or newer.
+
+## Verify the install
+
+<Terminal title="zsh" ansi={'[32m$[0m nosecrets --version\nnosecrets 0.3.8'} />
+
+## Next steps
+
+Continue with the [Quickstart](../quickstart/) to establish the initial baseline and add the hook.

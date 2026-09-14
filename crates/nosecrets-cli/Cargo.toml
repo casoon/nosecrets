@@ -14,12 +14,10 @@ readme = "README.md"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
-nosecrets-core = { path = "../nosecrets-core", version = "0.3.6" }
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.6" }
-nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.6" }
-nosecrets-report = { path = "../nosecrets-report", version = "0.3.6" }
+nosecrets-core = { path = "../nosecrets-core", version = "0.3.8" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.8" }
+nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.8" }
+nosecrets-report = { path = "../nosecrets-report", version = "0.3.8" }
 
 [[bin]]
 name = "nosecrets"

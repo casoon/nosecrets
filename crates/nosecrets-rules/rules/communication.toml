@@ -60,5 +60,5 @@ capture = 1
 
 [rule.validate]
 prefix = ["key-"]
-charset = "a-f0-9\\-"
+charset = "a-z0-9\\-"
 length = 36

@@ -1,0 +1,91 @@
+---
+import {
+  Badge,
+  Badges,
+  CodeBlock,
+  Facts,
+  Features,
+  Hero,
+  Install,
+  Quickstart,
+  Terminal,
+} from '@casoon/pages-theme/components';
+import Base from '@casoon/pages-theme/layouts/Base.astro';
+
+const hook = `repos:
+  - repo: local
+    hooks:
+      - id: nosecrets
+        name: nosecrets
+        entry: nosecrets scan --staged
+        language: system
+        pass_filenames: false`;
+---
+
+<Base>
+  <Hero
+    title="Catch secrets before they become commits."
+    lead="nosecrets scans locally and offline. Run one complete check of the Git index when adopting it, then inspect the exact staged blobs on every commit."
+  >
+    <Install
+      commands={[
+        { label: 'curl', command: 'curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh' },
+        { label: 'npm', command: 'npm install -g @casoon/nosecrets' },
+        { label: 'cargo', command: 'cargo install nosecrets-cli' },
+      ]}
+    />
+    <Badges>
+      <Badge>MIT</Badge>
+      <Badge>v0.3.8</Badge>
+      <Badge tone="accent">offline</Badge>
+      <Badge>Rust CLI</Badge>
+    </Badges>
+    <Terminal
+      slot="output"
+      title="nosecrets scan --staged"
+      dots
+      ansi={'\u001b[32mNo secrets found\u001b[0m'}
+    />
+  </Hero>
+
+  <Facts
+    items={[
+      { value: '50', label: 'built-in service and generic rules' },
+      { value: '2', label: 'Git index scan modes' },
+      { value: '0', label: 'network calls while scanning' },
+      { value: '3', label: 'installation methods' },
+    ]}
+  />
+
+  <Features
+    items={[
+      {
+        title: 'Exact staged contents',
+        body: 'The pre-commit scan reads blobs from the Git index, not possibly different files from the working tree.',
+      },
+      {
+        title: 'One complete baseline',
+        body: 'The tracked scan checks every file in the current Git index when you first add nosecrets to an existing repository.',
+      },
+      {
+        title: 'Layered detection',
+        body: 'Known formats use regex, prefilters and validation. Entropy detection covers unknown tokens near secret-related context.',
+      },
+      {
+        title: 'Reviewable exceptions',
+        body: 'Path rules, allowlists, inline markers and stable fingerprints keep false-positive handling explicit.',
+      },
+    ]}
+  />
+
+  <Quickstart
+    lead="Establish a baseline once, then protect every new commit."
+    steps={[
+      'Install the CLI and run <code>nosecrets scan --tracked</code>.',
+      'Review findings and record intentional exceptions.',
+      'Add <code>nosecrets scan --staged</code> to the pre-commit hook.',
+    ]}
+  >
+    <CodeBlock code={hook} lang="yaml" title=".pre-commit-config.yaml" label="YAML" />
+  </Quickstart>
+</Base>

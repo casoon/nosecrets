@@ -1,13 +1,13 @@
 {
   "name": "@casoon/nosecrets",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Fast, offline secret scanner for Git pre-commit hooks",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/casoon/nosecrets"
   },
-  "homepage": "https://nosecrets.casoon.dev",
+  "homepage": "https://nosecrets.casoon.de",
   "bin": {
     "nosecrets": "bin/nosecrets"
   },

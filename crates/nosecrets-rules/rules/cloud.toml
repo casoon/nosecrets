@@ -63,7 +63,7 @@ capture = 1
 
 [rule.validate]
 prefix = ["dop_v1_"]
-charset = "a-f0-9"
+charset = "a-z0-9_"
 length = 71
 
 [[rule]]

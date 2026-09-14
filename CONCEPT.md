@@ -19,7 +19,8 @@ Performanter Secret-Scanner in Rust, fokussiert auf Pre-Commit Hooks.
     │   ├── nosecrets-rules/      # Regel-Parser
     │   ├── nosecrets-filter/     # Ignore/Allow System
     │   └── nosecrets-report/     # Output-Formate
-    ├── rules/                    # Default-Regeln (TOML)
+    ├── crates/nosecrets-rules/
+    │   └── rules/                # Default-Regeln (TOML)
     └── .pre-commit-hooks.yaml
 
 ## Detection Pipeline
@@ -29,15 +30,21 @@ Performanter Secret-Scanner in Rust, fokussiert auf Pre-Commit Hooks.
     3. Ignore/Allow Check
     4. Report oder Block
 
-Keine Shannon-Entropie. Keine API-Verification.
+Optionale Shannon-Entropie-Erkennung mit Kontextfilter. Keine API-Verification.
 
 ## CLI
 
     # Pre-Commit (Default)
     nosecrets scan --staged
 
+    # Einmaliger Initialscan aller getrackten Dateien
+    nosecrets scan --tracked
+
     # Dateien scannen
     nosecrets scan src/
+
+    # Zusaetzliche Regeln laden
+    nosecrets scan --rules .nosecrets-rules.toml src/
 
     # Interaktiver Modus
     nosecrets scan --staged --interactive
@@ -106,10 +113,12 @@ Keine Shannon-Entropie. Keine API-Verification.
 - aho-corasick - Keyword Prefiltering
 - serde/toml - Konfiguration
 - rayon - Parallelisierung
-- gix - Git (staged files)
+- git CLI - Repository-Erkennung und staged Blob-Inhalte
 
-## Performance-Ziele
+## Performance
 
-- Startup: <20ms
-- Scan: >200 MB/s
-- Memory: <50 MB
+- Regeln werden einmal pro Prozess kompiliert.
+- Dateipfade werden parallel gescannt.
+- Initialscans lesen alle getrackten Index-Blobs; Pre-Commit-Scans nur geaenderte Blobs.
+- Git-Inhalte werden in einem gebuendelten `git cat-file`-Prozess gelesen.
+- Konkrete Leistungsziele benoetigen reproduzierbare Benchmarks.

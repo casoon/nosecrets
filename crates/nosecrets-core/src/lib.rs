@@ -2,8 +2,9 @@ pub mod entropy;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output, Stdio};
 use std::sync::Arc;
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
@@ -51,9 +52,20 @@ impl Detector {
         entropy_config: EntropyConfig,
     ) -> Result<Self> {
         let mut compiled = Vec::with_capacity(rules.len());
+        let mut rule_ids = HashSet::new();
         for rule in rules {
+            if !rule_ids.insert(rule.id.clone()) {
+                return Err(anyhow!("duplicate rule id {}", rule.id));
+            }
             let regex = Regex::new(&rule.pattern)
                 .with_context(|| format!("invalid regex for rule {}", rule.id))?;
+            if rule.capture >= regex.captures_len() {
+                return Err(anyhow!(
+                    "capture group {} does not exist for rule {}",
+                    rule.capture,
+                    rule.id
+                ));
+            }
             let (allow_patterns, allow_values) = compile_rule_allow(rule.allow.as_ref())?;
             let (include_paths, exclude_paths) = compile_rule_paths(rule.paths.as_ref())?;
             let charset_regex = compile_charset(rule.validate.as_ref())?;
@@ -88,29 +100,45 @@ impl Detector {
     }
 
     pub fn scan_files(&self, root: &Path, files: &[PathBuf]) -> Result<Vec<Finding>> {
-        let findings: Vec<Finding> = files
+        let findings: Result<Vec<Vec<Finding>>> = files
             .par_iter()
-            .flat_map(|path| match self.scan_file(root, path) {
-                Ok(results) => results,
-                Err(error) => {
-                    eprintln!("nosecrets: failed to scan {}: {}", path.display(), error);
-                    Vec::new()
-                }
-            })
+            .map(|path| self.scan_file(root, path))
             .collect();
-        Ok(findings)
+        Ok(findings?.into_iter().flatten().collect())
+    }
+
+    pub fn scan_staged_files(&self, repo_root: &Path) -> Result<Vec<Finding>> {
+        let files = collect_staged_blobs(repo_root)?;
+        self.scan_git_blobs(repo_root, &files)
+    }
+
+    pub fn scan_tracked_files(&self, repo_root: &Path) -> Result<Vec<Finding>> {
+        let files = collect_tracked_blobs(repo_root)?;
+        self.scan_git_blobs(repo_root, &files)
+    }
+
+    fn scan_git_blobs(&self, repo_root: &Path, files: &[GitBlob]) -> Result<Vec<Finding>> {
+        let findings: Result<Vec<Vec<Finding>>> = files
+            .par_iter()
+            .map(|file| self.scan_content(repo_root, &file.path, &file.content))
+            .collect();
+        Ok(findings?.into_iter().flatten().collect())
     }
 
     fn scan_file(&self, root: &Path, path: &Path) -> Result<Vec<Finding>> {
+        let content = fs::read(path).with_context(|| format!("reading {}", path.display()))?;
+        self.scan_content(root, path, &content)
+    }
+
+    fn scan_content(&self, root: &Path, path: &Path, content: &[u8]) -> Result<Vec<Finding>> {
         let rel_path = path.strip_prefix(root).unwrap_or(path);
         if self.filter.is_path_ignored(rel_path) {
             return Ok(Vec::new());
         }
-        let content = fs::read(path).with_context(|| format!("reading {}", path.display()))?;
         if content.contains(&0) {
             return Ok(Vec::new());
         }
-        let text = String::from_utf8_lossy(&content);
+        let text = String::from_utf8_lossy(content);
         let line_starts = build_line_starts(&text);
         let mut findings = Vec::new();
 
@@ -409,26 +437,31 @@ pub fn collect_files(root: &Path, inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
 }
 
 pub fn discover_repo_root(start: &Path) -> Result<Option<PathBuf>> {
-    match gix::discover(start) {
-        Ok(repo) => Ok(repo.work_dir().map(|path| path.to_path_buf())),
-        Err(_) => Ok(None),
-    }
-}
-
-pub fn collect_staged_files(repo_root: &Path) -> Result<Vec<PathBuf>> {
     let output = Command::new("git")
         .arg("-C")
-        .arg(repo_root)
-        .args(["diff", "--name-only", "--cached", "--diff-filter=ACM"])
+        .arg(start)
+        .args(["rev-parse", "--show-toplevel"])
         .output()
         .with_context(|| "failed to execute git")?;
-
     if !output.status.success() {
-        return Err(anyhow!(
-            "git diff --name-only --cached failed with status {}",
-            output.status
-        ));
+        return Ok(None);
     }
+    let path = String::from_utf8(output.stdout)
+        .with_context(|| "git returned a non-UTF-8 repository path")?;
+    Ok(Some(PathBuf::from(path.trim_end_matches(['\r', '\n']))))
+}
+
+/// Returns working-tree paths whose names are staged.
+///
+/// This does not expose staged contents. Use [`Detector::scan_staged_files`] when the exact index
+/// snapshot must be scanned.
+#[deprecated(note = "use Detector::scan_staged_files to scan exact staged contents")]
+pub fn collect_staged_files(repo_root: &Path) -> Result<Vec<PathBuf>> {
+    let output = run_git(
+        repo_root,
+        &["diff", "--name-only", "--cached", "--diff-filter=ACM"],
+        "git diff --name-only --cached",
+    )?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut files = Vec::new();
@@ -440,6 +473,189 @@ pub fn collect_staged_files(repo_root: &Path) -> Result<Vec<PathBuf>> {
         files.push(repo_root.join(trimmed));
     }
     Ok(files)
+}
+
+struct GitBlob {
+    path: PathBuf,
+    object_id: String,
+    content: Vec<u8>,
+}
+
+fn collect_staged_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
+    let output = run_git(
+        repo_root,
+        &[
+            "diff",
+            "--cached",
+            "--raw",
+            "--no-abbrev",
+            "-z",
+            "--diff-filter=ACMR",
+        ],
+        "git diff --cached",
+    )?;
+
+    let mut fields = output.stdout.split(|byte| *byte == 0);
+    let mut blobs = Vec::new();
+    while let Some(header) = fields.next() {
+        if header.is_empty() {
+            break;
+        }
+        let header = std::str::from_utf8(header).with_context(|| "invalid git diff metadata")?;
+        let parts: Vec<&str> = header.split_ascii_whitespace().collect();
+        if parts.len() != 5 || !parts[0].starts_with(':') {
+            return Err(anyhow!("unexpected git diff metadata: {header}"));
+        }
+        let new_mode = parts[1];
+        let object_id = parts[3];
+        let status = parts[4]
+            .as_bytes()
+            .first()
+            .copied()
+            .ok_or_else(|| anyhow!("missing git diff status"))?;
+        let first_path = fields
+            .next()
+            .ok_or_else(|| anyhow!("missing path in git diff output"))?;
+        let path = if matches!(status, b'R' | b'C') {
+            fields
+                .next()
+                .ok_or_else(|| anyhow!("missing destination path in git diff output"))?
+        } else {
+            first_path
+        };
+
+        if new_mode == "160000" {
+            continue;
+        }
+        blobs.push(GitBlob {
+            path: PathBuf::from(String::from_utf8_lossy(path).into_owned()),
+            object_id: object_id.to_string(),
+            content: Vec::new(),
+        });
+    }
+
+    load_git_blob_contents(repo_root, blobs)
+}
+
+fn collect_tracked_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
+    let output = run_git(
+        repo_root,
+        &["ls-files", "--stage", "-z"],
+        "git ls-files --stage",
+    )?;
+
+    let mut blobs = Vec::new();
+    for entry in output.stdout.split(|byte| *byte == 0) {
+        if entry.is_empty() {
+            continue;
+        }
+        let Some(tab) = entry.iter().position(|byte| *byte == b'\t') else {
+            return Err(anyhow!("unexpected git ls-files output"));
+        };
+        let metadata =
+            std::str::from_utf8(&entry[..tab]).with_context(|| "invalid git ls-files metadata")?;
+        let parts: Vec<&str> = metadata.split_ascii_whitespace().collect();
+        if parts.len() != 3 {
+            return Err(anyhow!("unexpected git ls-files metadata: {metadata}"));
+        }
+        if parts[2] != "0" {
+            return Err(anyhow!("cannot scan an index with unmerged files"));
+        }
+        if parts[0] == "160000" {
+            continue;
+        }
+        blobs.push(GitBlob {
+            path: PathBuf::from(String::from_utf8_lossy(&entry[tab + 1..]).into_owned()),
+            object_id: parts[1].to_string(),
+            content: Vec::new(),
+        });
+    }
+
+    load_git_blob_contents(repo_root, blobs)
+}
+
+fn run_git(repo_root: &Path, args: &[&str], operation: &str) -> Result<Output> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_root)
+        .args(args)
+        .output()
+        .with_context(|| format!("failed to execute {operation}"))?;
+    if !output.status.success() {
+        return Err(anyhow!("{operation} failed with status {}", output.status));
+    }
+    Ok(output)
+}
+
+fn load_git_blob_contents(repo_root: &Path, mut blobs: Vec<GitBlob>) -> Result<Vec<GitBlob>> {
+    if blobs.is_empty() {
+        return Ok(blobs);
+    }
+
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(repo_root)
+        .args(["cat-file", "--batch"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .with_context(|| "failed to read staged git objects")?;
+
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow!("failed to open git cat-file stdin"))?;
+    let object_ids: Vec<String> = blobs.iter().map(|blob| blob.object_id.clone()).collect();
+    let writer = std::thread::spawn(move || -> std::io::Result<()> {
+        for object_id in object_ids {
+            writeln!(stdin, "{object_id}")?;
+        }
+        Ok(())
+    });
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("failed to open git cat-file stdout"))?;
+    let mut reader = BufReader::new(stdout);
+    for blob in &mut blobs {
+        let mut header = String::new();
+        reader.read_line(&mut header)?;
+        let mut parts = header.split_ascii_whitespace();
+        let returned_id = parts
+            .next()
+            .ok_or_else(|| anyhow!("missing object id for staged object {}", blob.object_id))?;
+        let object_type = parts
+            .next()
+            .ok_or_else(|| anyhow!("missing type for staged object {}", blob.object_id))?;
+        let size = parts
+            .next()
+            .ok_or_else(|| anyhow!("missing size for staged object {}", blob.object_id))?
+            .parse::<usize>()
+            .with_context(|| format!("invalid size for staged object {}", blob.object_id))?;
+        if returned_id != blob.object_id || object_type != "blob" {
+            return Err(anyhow!(
+                "unexpected staged object response: {}",
+                header.trim()
+            ));
+        }
+        blob.content.resize(size, 0);
+        reader.read_exact(&mut blob.content)?;
+        let mut newline = [0_u8; 1];
+        reader.read_exact(&mut newline)?;
+        if newline[0] != b'\n' {
+            return Err(anyhow!("invalid staged object delimiter"));
+        }
+    }
+
+    let status = child.wait()?;
+    writer
+        .join()
+        .map_err(|_| anyhow!("git cat-file input thread panicked"))??;
+    if !status.success() {
+        return Err(anyhow!("git cat-file failed with status {status}"));
+    }
+    Ok(blobs)
 }
 
 fn build_line_starts(text: &str) -> Vec<usize> {
@@ -507,6 +723,16 @@ mod tests {
         }
     }
 
+    fn git(root: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .status()
+            .expect("run git");
+        assert!(status.success(), "git command failed: {args:?}");
+    }
+
     #[test]
     fn detects_secret_with_position() {
         let dir = tempdir().expect("tempdir");
@@ -530,6 +756,114 @@ mod tests {
         assert_eq!(finding.path, "src/config.txt");
         assert_eq!(finding.line, 1);
         assert_eq!(finding.column, expected_col);
+    }
+
+    #[test]
+    fn staged_scan_reads_the_index_instead_of_the_worktree() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        let path = root.join("config.txt");
+        fs::write(&path, "secret_ABC123\n").expect("write staged file");
+        git(root, &["add", "config.txt"]);
+        fs::remove_file(&path).expect("remove worktree file");
+
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let detector =
+            Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector");
+        let findings = detector.scan_staged_files(root).expect("scan staged files");
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].path, "config.txt");
+    }
+
+    #[test]
+    fn staged_scan_ignores_unstaged_worktree_content() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        let path = root.join("config.txt");
+        fs::write(&path, "clean\n").expect("write staged file");
+        git(root, &["add", "config.txt"]);
+        fs::write(&path, "secret_ABC123\n").expect("write worktree file");
+
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let detector =
+            Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector");
+        let findings = detector.scan_staged_files(root).expect("scan staged files");
+
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn tracked_scan_covers_the_full_index_while_staged_scan_does_not() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        let path = root.join("existing.txt");
+        fs::write(&path, "secret_ABC123\n").expect("write tracked file");
+        git(root, &["add", "existing.txt"]);
+        git(
+            root,
+            &[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "-qm",
+                "initial",
+            ],
+        );
+        fs::remove_file(&path).expect("remove worktree file");
+
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let detector =
+            Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector");
+
+        assert!(detector
+            .scan_staged_files(root)
+            .expect("scan staged files")
+            .is_empty());
+        let tracked = detector
+            .scan_tracked_files(root)
+            .expect("scan tracked files");
+        assert_eq!(tracked.len(), 1);
+        assert_eq!(tracked[0].path, "existing.txt");
+    }
+
+    #[test]
+    fn file_scan_propagates_read_errors() {
+        let dir = tempdir().expect("tempdir");
+        let missing = dir.path().join("missing.txt");
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let detector =
+            Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector");
+
+        assert!(detector.scan_files(dir.path(), &[missing]).is_err());
+    }
+
+    #[test]
+    fn detector_rejects_duplicate_rule_ids() {
+        let rule = base_rule(r"(secret_[A-Z0-9]{6})");
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let error = Detector::new(vec![rule.clone(), rule], filter)
+            .err()
+            .expect("duplicate ids must fail");
+
+        assert!(error.to_string().contains("duplicate rule id"));
+    }
+
+    #[test]
+    fn detector_rejects_missing_capture_groups() {
+        let mut rule = base_rule(r"secret_[A-Z0-9]{6}");
+        rule.capture = 1;
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let error = Detector::new(vec![rule], filter)
+            .err()
+            .expect("missing capture group must fail");
+
+        assert!(error.to_string().contains("capture group 1 does not exist"));
     }
 
     #[test]

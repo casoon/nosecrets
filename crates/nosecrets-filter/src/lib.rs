@@ -169,10 +169,11 @@ pub fn load_ignore_file(path: &Path) -> Result<Vec<IgnoreEntry>, FilterError> {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        let mut parts = trimmed.splitn(2, ':');
-        let fingerprint = parts.next().unwrap().trim().to_string();
-        let matcher = parts
-            .next()
+        let (fingerprint, path_glob) = match trimmed.split_once(':') {
+            Some((fingerprint, glob)) => (fingerprint, Some(glob)),
+            None => (trimmed, None),
+        };
+        let matcher = path_glob
             .map(|glob| glob.trim())
             .filter(|glob| !glob.is_empty())
             .map(|glob| {
@@ -186,7 +187,7 @@ pub fn load_ignore_file(path: &Path) -> Result<Vec<IgnoreEntry>, FilterError> {
             })
             .transpose()?;
         entries.push(IgnoreEntry {
-            fingerprint,
+            fingerprint: fingerprint.trim().to_string(),
             matcher,
         });
     }
@@ -324,6 +325,17 @@ mod tests {
         let filter = Filter::from_config(None, entries).expect("build filter");
         assert!(filter.is_fingerprint_ignored("nsi_123", Path::new("src/main.rs")));
         assert!(!filter.is_fingerprint_ignored("nsi_123", Path::new("tests/main.rs")));
+    }
+
+    #[test]
+    fn ignore_file_accepts_fingerprint_without_path() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join(".nosecretsignore");
+        fs::write(&path, "nsi_123\n").expect("write ignore");
+        let entries = load_ignore_file(&path).expect("load ignore");
+        let filter = Filter::from_config(None, entries).expect("build filter");
+
+        assert!(filter.is_fingerprint_ignored("nsi_123", Path::new("any/path")));
     }
 
     #[test]

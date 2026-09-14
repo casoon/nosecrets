@@ -9,11 +9,11 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.3.7"
+version = "0.3.8"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/casoon/nosecrets"
-homepage = "https://nosecrets.casoon.dev"
+homepage = "https://nosecrets.casoon.de"
 rust-version = "1.85"
 description = "Fast, offline secret scanner for Git pre-commit hooks"
 keywords = ["security", "secrets", "git", "pre-commit", "scanner"]
@@ -35,24 +35,15 @@ toml = "0.8"
 # Async/Parallel
 rayon = "1"
 
-# Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
 # Utilities
 thiserror = "2"
 anyhow = "1"
 walkdir = "2"
 sha2 = "0.10"
 hex = "0.4"
-once_cell = "1"
 globset = "0.4"
 
-# Git
-gix = { version = "0.68", default-features = false, features = ["revision"] }
-
 # Terminal
-termcolor = "1"
 console = "0.15"
 
 # Testing

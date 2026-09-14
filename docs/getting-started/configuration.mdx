@@ -1,0 +1,63 @@
+---
+title: Configuration
+description: Exclude paths, allow known test values, tune entropy detection and record reviewed findings.
+order: 3
+---
+
+nosecrets loads `.nosecrets.toml` and `.nosecretsignore` from the repository root. Common generated
+directories such as `.git`, `node_modules`, `target`, `dist`, `build` and coverage output are ignored
+by default.
+
+## Repository configuration
+
+```toml
+[ignore]
+paths = ["vendor/", "fixtures/**"]
+
+[allow]
+patterns = ["^test_[A-Za-z0-9]+$"]
+values = ["AKIAIOSFODNN7EXAMPLE"]
+
+[entropy]
+enabled = true
+min_length = 20
+threshold = 4.2
+require_context = true
+
+[entropy.allow]
+patterns = ["^[a-f0-9]{32,}$"]
+```
+
+Global allow patterns and values apply to all findings. Entropy-specific patterns apply only to
+the high-entropy detector. With `require_context = true`, entropy candidates must appear near terms
+such as `secret`, `token`, `key`, `auth` or `password`.
+
+## Fingerprint ignores
+
+`.nosecretsignore` accepts one stable fingerprint per line. Add `:<path-glob>` to limit an exception:
+
+```text
+nsi_a1b2c3d4e5f6
+nsi_b2c3d4e5f6a7:tests/fixtures/**
+```
+
+The CLI can append the same entries:
+
+```sh
+nosecrets ignore nsi_a1b2c3d4e5f6
+nosecrets ignore nsi_b2c3d4e5f6a7 --path 'tests/fixtures/**'
+```
+
+## Inline ignores
+
+Use an inline marker only when the reason is obvious beside the value:
+
+```text
+api_key = "documented-example" # @nosecrets-ignore
+api_key = "documented-example" # @nsi test fixture
+```
+
+<Callout type="caution">
+  An allowlist suppresses a finding; it does not make the value safe. Prefer narrow path-scoped
+  fingerprints for individual reviewed cases.
+</Callout>

@@ -17,11 +17,10 @@ regex.workspace = true
 aho-corasick.workspace = true
 rayon.workspace = true
 walkdir.workspace = true
-gix.workspace = true
 globset.workspace = true
-nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.6" }
-nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.6" }
-nosecrets-report = { path = "../nosecrets-report", version = "0.3.6" }
+nosecrets-rules = { path = "../nosecrets-rules", version = "0.3.8" }
+nosecrets-filter = { path = "../nosecrets-filter", version = "0.3.8" }
+nosecrets-report = { path = "../nosecrets-report", version = "0.3.8" }
 
 [dev-dependencies]
 tempfile.workspace = true

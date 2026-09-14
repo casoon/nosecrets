@@ -24,7 +24,7 @@ fn create_detector_with_entropy(config: EntropyConfig) -> Detector {
 
 fn scan_content(detector: &Detector, content: &str) -> Vec<String> {
     let dir = tempdir().expect("tempdir");
-    let path = dir.path().join("test.txt");
+    let path = dir.path().join("test.env");
     fs::write(&path, content).expect("write");
     let findings = detector.scan_files(dir.path(), &[path]).expect("scan");
     findings.into_iter().map(|f| f.rule_id).collect()
@@ -207,6 +207,157 @@ fn detects_twilio_auth_token() {
         "expected twilio-auth-token, got {:?}",
         rule_ids
     );
+}
+
+#[test]
+fn every_builtin_rule_has_a_detection_fixture() {
+    let cases = vec![
+        (
+            "azure-storage-key",
+            format!("azure storage key = \"{}\" ", "a".repeat(88)),
+        ),
+        ("digitalocean-token", format!("dop_v1_{}", "a1".repeat(32))),
+        (
+            "cloudflare-api-token",
+            format!("cloudflare api token = \"{}\" ", "q1".repeat(20)),
+        ),
+        (
+            "cloudflare-global-api-key",
+            format!("cloudflare global key = \"a{}\" ", "1a".repeat(18)),
+        ),
+        (
+            "cloudflare-origin-ca-key",
+            format!("v1.0-{}-{}", "a1".repeat(12), "b2".repeat(73)),
+        ),
+        ("github-oauth", format!("gho_{}", "a1".repeat(18))),
+        ("github-app", format!("ghu_{}", "b2".repeat(18))),
+        ("gitlab-pat", format!("glpat-{}", "a1".repeat(10))),
+        ("pypi-token", format!("pypi-{}", "a1".repeat(25))),
+        (
+            "slack-token",
+            format!("xoxb-1234567890-1234567890-{}", "a1".repeat(12)),
+        ),
+        (
+            "slack-webhook",
+            format!(
+                "https://hooks.slack.com/services/TABCDEFGH/BABCDEFGH/{}",
+                "a1".repeat(12)
+            ),
+        ),
+        (
+            "discord-token",
+            format!("discord = M{}.abcdef.{}", "a".repeat(23), "b".repeat(27)),
+        ),
+        (
+            "discord-webhook",
+            format!(
+                "https://discord.com/api/webhooks/12345678901234567/{}",
+                "a1".repeat(30)
+            ),
+        ),
+        (
+            "netlify-access-token",
+            format!("netlify token = \"{}\" ", "q1".repeat(20)),
+        ),
+        ("flyio-access-token", format!("fo1_{}", "a".repeat(43))),
+        (
+            "heroku-api-key",
+            "heroku api_key = \"12345678-1234-1234-1234-123456789abc\" ".to_string(),
+        ),
+        ("heroku-api-key-v2", format!("HRKU-AA{}", "a1".repeat(29))),
+        (
+            "vercel-token",
+            format!("vercel token = \"{}\" ", "q1".repeat(10)),
+        ),
+        (
+            "railway-token",
+            format!("railway token = \"{}\" ", "q1".repeat(10)),
+        ),
+        (
+            "render-api-key",
+            format!("render api_key = \"{}\" ", "q1".repeat(10)),
+        ),
+        (
+            "supabase-anon-key",
+            format!(
+                "supabase anon = \"{}.{}.{}\"",
+                "a1".repeat(10),
+                "b2".repeat(10),
+                "c3".repeat(10)
+            ),
+        ),
+        (
+            "supabase-service-role-key",
+            format!(
+                "supabase service_role = \"{}.{}.{}\"",
+                "d4".repeat(10),
+                "e5".repeat(10),
+                "f6".repeat(10)
+            ),
+        ),
+        (
+            "generic-secret",
+            "client_secret = \"AbCdEfGh12345678\"".to_string(),
+        ),
+        (
+            "password-assignment",
+            "password = \"CorrectHorseBatteryStaple\"".to_string(),
+        ),
+        (
+            "basic-auth",
+            "Authorization = \"Basic dXNlcjpzZWNyZXQ=\"".to_string(),
+        ),
+        ("twilio-api-key", format!("SK{}", "a1".repeat(16))),
+        ("mailchimp-api-key", format!("{}-us12", "a1".repeat(16))),
+        ("mailgun-api-key", format!("key-{}", "a1".repeat(16))),
+        (
+            "mongodb-connection-uri",
+            "mongodb://user:s3cur3value@db.example.invalid/app".to_string(),
+        ),
+        (
+            "redis-connection-uri",
+            "redis://user:s3cur3value@db.example.invalid/0".to_string(),
+        ),
+        (
+            "mssql-connection-uri",
+            "mssql://user:s3cur3value@db.example.invalid/app".to_string(),
+        ),
+        (
+            "jdbc-password-param",
+            "jdbc:postgresql://db.example.invalid/app?password=s3cur3value".to_string(),
+        ),
+        ("stripe-secret-key", format!("sk_live_{}", "a1".repeat(12))),
+        (
+            "stripe-restricted-key",
+            format!("rk_live_{}", "a1".repeat(12)),
+        ),
+        (
+            "stripe-webhook-secret",
+            format!("whsec_{}", "a1".repeat(16)),
+        ),
+        (
+            "paypal-client-secret",
+            format!("paypal client secret = \"{}\" ", "q1".repeat(20)),
+        ),
+        ("square-access-token", format!("sq0atp-{}", "a1".repeat(11))),
+        (
+            "square-oauth-secret",
+            format!("sq0csp-{}a", "a1".repeat(21)),
+        ),
+    ];
+
+    let entropy = EntropyConfig {
+        enabled: false,
+        ..EntropyConfig::default()
+    };
+    let detector = create_detector_with_entropy(entropy);
+    for (rule_id, content) in cases {
+        let rule_ids = scan_content(&detector, &content);
+        assert!(
+            rule_ids.iter().any(|actual| actual == rule_id),
+            "expected {rule_id} for {content:?}, got {rule_ids:?}"
+        );
+    }
 }
 
 // Note: The following tests are commented out because GitHub's push protection

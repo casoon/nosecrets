@@ -67,9 +67,9 @@ Regeln werden in TOML definiert.
 | critical | Sofort blockieren | 1 |
 | high | Blockieren | 1 |
 | medium | Warnung, blockieren | 1 |
-| low | Nur Warnung | 0 (konfigurierbar) |
+| low | Nur Warnung | 0 |
 
-## Kategorien (geplant)
+## Kategorien
 
 Regeln werden in Dateien organisiert:
 
@@ -77,8 +77,7 @@ Regeln werden in Dateien organisiert:
     ├── cloud.toml      # AWS, GCP, Azure, etc.
     ├── deploy.toml     # Vercel, Netlify, Fly.io, etc.
     ├── code.toml       # GitHub, GitLab, npm, etc.
-    ├── payment.toml    # Stripe, PayPal, etc.
+    ├── communication.toml # SendGrid, Twilio, Mailchimp, Mailgun
     ├── database.toml   # MongoDB, Redis, etc.
-    ├── auth.toml       # JWT, OAuth, etc.
-    ├── messaging.toml  # Slack, Discord, etc.
+    ├── payment.toml    # Stripe
     └── generic.toml    # Private Keys, Passwords

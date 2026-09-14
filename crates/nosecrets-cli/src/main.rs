@@ -1,14 +1,14 @@
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
-use nosecrets_core::{collect_files, collect_staged_files, discover_repo_root, Detector};
+use nosecrets_core::{collect_files, discover_repo_root, Detector};
 use nosecrets_filter::{load_ignore_file, normalize_path, Config, Filter};
 use nosecrets_report::Report;
-use nosecrets_rules::load_builtin_rules;
+use nosecrets_rules::{load_builtin_rules, parse_rules};
 
 #[derive(Parser, Debug)]
 #[command(name = "nosecrets", version, about = "Fast offline secret scanner")]
@@ -28,8 +28,11 @@ enum Commands {
 #[derive(Parser, Debug)]
 struct ScanArgs {
     /// Scan staged files
-    #[arg(long)]
+    #[arg(long, conflicts_with_all = ["tracked", "paths"])]
     staged: bool,
+    /// Scan all Git-tracked files from the index
+    #[arg(long, conflicts_with_all = ["staged", "paths"])]
+    tracked: bool,
     /// Ask to ignore findings interactively
     #[arg(long)]
     interactive: bool,
@@ -39,6 +42,9 @@ struct ScanArgs {
     /// Output format
     #[arg(long, value_enum, default_value = "text")]
     format: OutputFormat,
+    /// Load additional detection rules from a TOML file
+    #[arg(long = "rules", value_name = "FILE")]
+    rule_files: Vec<PathBuf>,
     /// Files or directories to scan
     paths: Vec<PathBuf>,
 }
@@ -81,19 +87,34 @@ fn run_scan(args: ScanArgs) -> Result<()> {
         .unwrap_or_default();
     let ignore_entries = load_ignore_file(&root.join(".nosecretsignore"))?;
     let filter = Filter::from_config(config, ignore_entries)?;
-    let rules = load_builtin_rules()?;
+    let mut rules = load_builtin_rules()?;
+    for rule_file in &args.rule_files {
+        let path = if rule_file.is_absolute() {
+            rule_file.clone()
+        } else {
+            root.join(rule_file)
+        };
+        let content = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read rules from {}", path.display()))?;
+        rules.extend(parse_rules(&content, &path.display().to_string())?);
+    }
     let detector = Detector::with_entropy(rules, filter, entropy_config)?;
 
-    let files = if args.staged {
+    let findings = if args.staged || args.tracked {
         let Some(repo_root) = repo_root else {
-            return Err(anyhow::anyhow!("--staged requires a git repository"));
+            return Err(anyhow::anyhow!(
+                "--staged and --tracked require a git repository"
+            ));
         };
-        collect_staged_files(&repo_root)?
+        if args.staged {
+            detector.scan_staged_files(&repo_root)?
+        } else {
+            detector.scan_tracked_files(&repo_root)?
+        }
     } else {
-        collect_files(&root, &args.paths)?
+        let files = collect_files(&root, &args.paths)?;
+        detector.scan_files(&root, &files)?
     };
-
-    let findings = detector.scan_files(&root, &files)?;
     let findings = if args.interactive {
         interactive_filter(&root, findings)?
     } else {

@@ -1,0 +1,44 @@
+---
+title: CLI reference
+description: Scan modes, output formats, exit codes and ignore commands in nosecrets 0.3.8.
+order: 1
+---
+
+## Scan modes
+
+| Command | Source | Intended use |
+| --- | --- | --- |
+| `nosecrets scan --tracked` | Every tracked blob in the Git index | One-time baseline when adopting nosecrets |
+| `nosecrets scan --staged` | Changed blobs staged for the next commit | Every pre-commit run |
+| `nosecrets scan [PATHS]…` | Files and directories in the working tree | Ad-hoc scans |
+
+`--tracked`, `--staged` and explicit paths are mutually exclusive. Both Git modes require a Git
+repository. The tracked scan rejects an unmerged index instead of silently choosing one side.
+
+## Scan options
+
+| Option | Meaning |
+| --- | --- |
+| `--interactive` | Ask whether each finding should be added to `.nosecretsignore` |
+| `--dry-run` | Print findings but always exit with status 0 |
+| `--format text` | Human-readable terminal output; this is the default |
+| `--format json` | Machine-readable JSON array |
+| `--rules <FILE>` | Load an additional TOML rule file; repeat to load more than one |
+
+Relative rule paths resolve from the repository root. Custom rules extend the built-in set.
+
+## Ignore command
+
+```text
+nosecrets ignore [--path <PATH>] [--file <FILE>] <FINGERPRINT>
+```
+
+Without `--file`, the command appends to `.nosecretsignore` in the repository root. `--path`
+restricts the fingerprint to a path glob.
+
+## Exit codes
+
+- `0`: no critical, high or medium findings; low-severity findings may still be shown.
+- `1`: at least one critical, high or medium finding.
+- Other non-zero status: nosecrets could not complete the scan, for example because a file or Git
+  object could not be read or configuration was invalid.

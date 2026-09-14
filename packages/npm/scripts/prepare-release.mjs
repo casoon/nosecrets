@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = path.resolve(__dirname, '..');
@@ -19,12 +20,6 @@ const targets = [
   {
     asset: 'nosecrets-aarch64-apple-darwin.tar.gz',
     vendorDir: 'npm-darwin-arm64',
-    binaryName: 'nosecrets',
-    executable: true,
-  },
-  {
-    asset: 'nosecrets-x86_64-apple-darwin.tar.gz',
-    vendorDir: 'npm-darwin-x64',
     binaryName: 'nosecrets',
     executable: true,
   },
@@ -60,6 +55,27 @@ function download(url, destination) {
   run('curl', ['--fail', '--location', '--silent', '--show-error', url, '--output', destination]);
 }
 
+function readChecksums() {
+  const checksumPath = path.join(tmp, 'SHA256SUMS');
+  download(`${baseUrl}/SHA256SUMS`, checksumPath);
+  return new Map(
+    readFileSync(checksumPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => line.trim().split(/\s+/, 2).reverse())
+  );
+}
+
+function verifyChecksum(assetPath, expected) {
+  if (!expected) {
+    throw new Error(`No checksum published for ${path.basename(assetPath)}`);
+  }
+  const actual = createHash('sha256').update(readFileSync(assetPath)).digest('hex');
+  if (actual !== expected) {
+    throw new Error(`Checksum verification failed for ${path.basename(assetPath)}`);
+  }
+}
+
 function ensureCleanVendorDir() {
   rmSync(vendorDir, { recursive: true, force: true });
   mkdirSync(vendorDir, { recursive: true });
@@ -90,12 +106,14 @@ function extractAsset(assetPath, target) {
 function main() {
   console.log(`Preparing @casoon/nosecrets npm package from ${repo} ${tag}`);
   ensureCleanVendorDir();
+  const checksums = readChecksums();
 
   for (const target of targets) {
     const assetPath = path.join(tmp, target.asset);
     const url = `${baseUrl}/${target.asset}`;
     console.log(`Downloading ${url}`);
     download(url, assetPath);
+    verifyChecksum(assetPath, checksums.get(target.asset));
     extractAsset(assetPath, target);
   }
 

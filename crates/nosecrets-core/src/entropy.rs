@@ -186,18 +186,17 @@ fn extract_assignment_values(
                 add_subtokens(val, val_offset, min_length, text, candidates, seen);
                 // Also store context from key
                 if !val.is_empty() {
-                    update_context_from_key(key, val_offset, candidates);
+                    update_context_from_key(key, candidates, |candidate| {
+                        candidate.byte_offset == val_offset
+                    });
                 }
             } else {
                 // Value is quoted, update context for the quoted candidates near this line
-                let key = key.to_string();
                 let line_byte_offset = byte_offset_of_line(text, trimmed);
-                update_context_from_key_for_line(
-                    &key,
-                    line_byte_offset,
-                    line_byte_offset + trimmed.len(),
-                    candidates,
-                );
+                let line_end = line_byte_offset + trimmed.len();
+                update_context_from_key(key, candidates, |candidate| {
+                    candidate.byte_offset >= line_byte_offset && candidate.byte_offset <= line_end
+                });
             }
         }
 
@@ -215,17 +214,17 @@ fn extract_assignment_values(
                             - trimmed[colon_pos + 1..].trim_start().len());
                     add_subtokens(val, val_offset, min_length, text, candidates, seen);
                     if !val.is_empty() {
-                        update_context_from_key(key, val_offset, candidates);
+                        update_context_from_key(key, candidates, |candidate| {
+                            candidate.byte_offset == val_offset
+                        });
                     }
                 } else {
-                    let key = key.to_string();
                     let line_byte_offset = byte_offset_of_line(text, trimmed);
-                    update_context_from_key_for_line(
-                        &key,
-                        line_byte_offset,
-                        line_byte_offset + trimmed.len(),
-                        candidates,
-                    );
+                    let line_end = line_byte_offset + trimmed.len();
+                    update_context_from_key(key, candidates, |candidate| {
+                        candidate.byte_offset >= line_byte_offset
+                            && candidate.byte_offset <= line_end
+                    });
                 }
             }
         }
@@ -333,39 +332,21 @@ fn byte_offset_of_line(full_text: &str, line: &str) -> usize {
     line.as_ptr() as usize - full_text.as_ptr() as usize
 }
 
-fn update_context_from_key(key: &str, val_offset: usize, candidates: &mut [EntropyCandidate]) {
-    let lower_key = key.to_lowercase();
-    for keyword in CONTEXT_KEYWORDS {
-        if lower_key.contains(keyword) {
-            // Update any candidates at or near this offset
-            for c in candidates.iter_mut() {
-                if c.byte_offset == val_offset && c.context_name.is_none() {
-                    c.context_name = Some(keyword.to_string());
-                }
-            }
-            return;
-        }
-    }
-}
-
-fn update_context_from_key_for_line(
+fn update_context_from_key(
     key: &str,
-    line_start: usize,
-    line_end: usize,
     candidates: &mut [EntropyCandidate],
+    candidate_matches: impl Fn(&EntropyCandidate) -> bool,
 ) {
     let lower_key = key.to_lowercase();
-    for keyword in CONTEXT_KEYWORDS {
-        if lower_key.contains(keyword) {
-            for c in candidates.iter_mut() {
-                if c.byte_offset >= line_start
-                    && c.byte_offset <= line_end
-                    && c.context_name.is_none()
-                {
-                    c.context_name = Some(keyword.to_string());
-                }
-            }
-            return;
+    let Some(keyword) = CONTEXT_KEYWORDS
+        .iter()
+        .find(|keyword| lower_key.contains(**keyword))
+    else {
+        return;
+    };
+    for candidate in candidates {
+        if candidate_matches(candidate) && candidate.context_name.is_none() {
+            candidate.context_name = Some((*keyword).to_string());
         }
     }
 }

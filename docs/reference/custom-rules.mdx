@@ -1,0 +1,58 @@
+---
+title: Custom rules
+description: Extend the 50 built-in rules with repository-specific TOML definitions.
+order: 2
+---
+
+Pass one or more TOML files with `--rules`:
+
+```sh
+nosecrets scan --rules .nosecrets-rules.toml --staged
+nosecrets scan --rules team.toml --rules project.toml src/
+```
+
+## Minimal rule
+
+```toml
+[[rule]]
+id = "internal-token"
+name = "Internal service token"
+severity = "high"
+pattern = '''\b(int_[A-Za-z0-9]{24})\b'''
+keywords = ["int_"]
+capture = 1
+```
+
+The pattern must contain the configured capture group. Rule IDs must be unique across built-in and
+custom rules.
+
+## Optional validation and filters
+
+```toml
+[rule.validate]
+prefix = ["int_"]
+charset = "A-Za-z0-9_"
+length = 28
+
+[rule.paths]
+include = ["src/**", "config/**"]
+exclude = ["tests/fixtures/**"]
+
+[rule.allow]
+patterns = ["EXAMPLE$"]
+values = ["int_000000000000000000000000"]
+```
+
+| Field | Purpose |
+| --- | --- |
+| `severity` | `critical`, `high`, `medium` or `low` |
+| `keywords` | Cheap prefilter terms checked before the regex |
+| `capture` | Secret capture group; defaults to 1 |
+| `validate.prefix` | Accepted prefixes |
+| `validate.charset` | Regex character class applied to the captured value |
+| `validate.length` | Exact captured length |
+| `validate.min_length`, `max_length` | Captured length range |
+| `paths.include`, `exclude` | Path globs limiting the rule |
+| `allow.patterns`, `values` | Rule-specific exceptions |
+
+The repository also contains the complete [rule specification](https://github.com/casoon/nosecrets/blob/main/RULES_SPEC.md).

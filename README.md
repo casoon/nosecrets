@@ -15,7 +15,7 @@ Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, an
 
 ## Install
 
-### curl (macOS and Linux)
+### curl (Apple Silicon macOS and Linux)
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh
@@ -45,8 +45,14 @@ cargo install nosecrets-cli
 # Scan staged files
 nosecrets scan --staged
 
+# Initial scan of every Git-tracked file
+nosecrets scan --tracked
+
 # Scan a directory
 nosecrets scan src/
+
+# Load additional rules
+nosecrets scan --rules .nosecrets-rules.toml src/
 
 # Interactive mode (add ignores)
 nosecrets scan --staged --interactive
@@ -54,6 +60,8 @@ nosecrets scan --staged --interactive
 # Add ignore by fingerprint
 nosecrets ignore nsi_abcdef123456
 ```
+
+For an existing repository, run `nosecrets scan --tracked` once when adopting the tool. It scans the complete Git index without including untracked files or unrelated working-tree changes. The pre-commit command `nosecrets scan --staged` then scans only the files changed for the next commit, using their exact staged contents.
 
 ### Exit codes
 
@@ -130,7 +138,7 @@ api_key = "sk_test_xxx"  # @nsi example key
 
 ## Default rules
 
-Rules are shipped in TOML files under `rules/`:
+Rules are shipped in TOML files under `crates/nosecrets-rules/rules/`:
 
 - `rules/cloud.toml` (AWS/GCP/Azure/Cloudflare, etc.)
 - `rules/deploy.toml` (Netlify, Fly.io, Heroku, Vercel, Railway, Render, Supabase)
@@ -143,14 +151,14 @@ Rules are shipped in TOML files under `rules/`:
 
 ### Help improve the rules
 
-The built-in rules are a starting point, but this tool becomes more valuable as the rule set grows and improves. You can define your own rules in a local TOML file, but if you discover new secret patterns or improve existing ones, please consider contributing them back.
+The built-in rules are a starting point, but this tool becomes more valuable as the rule set grows and improves. Load additional local TOML rules with `--rules <FILE>`; the format is documented in [`RULES_SPEC.md`](RULES_SPEC.md). The option may be repeated. If you discover new secret patterns or improve existing ones, please consider contributing them back.
 
 **Contributions welcome:**
 - New rules for services not yet covered
 - Improvements to existing patterns (better regex, fewer false positives)
 - Bug reports for missed secrets or false positives
 
-Open an issue or pull request at [github.com/casoon/nosecrets](https://github.com/casoon/nosecrets). More information at [nosecrets.casoon.dev](https://nosecrets.casoon.dev).
+Open an issue or pull request at [github.com/casoon/nosecrets](https://github.com/casoon/nosecrets). See the [GitHub Pages documentation](https://casoon.github.io/nosecrets/) for the complete guide.
 
 ## False positives
 
@@ -182,8 +190,8 @@ cargo run -p nosecrets-cli -- scan --staged
 Create and push a version tag from this repository:
 
 ```bash
-git tag v0.3.6
-git push origin v0.3.6
+git tag v0.3.8
+git push origin v0.3.8
 ```
 
 The tag workflow waits for CI, builds release binaries, publishes the GitHub release, publishes all crates to crates.io, and publishes the npm package with provenance.

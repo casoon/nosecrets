@@ -84,12 +84,16 @@ Generiert vom Tool, nicht manuell erstellt.
 
 | Metrik | Ziel |
 |--------|------|
-| Startup | <20ms |
-| Scan | >200 MB/s |
-| Memory | <50 MB |
-| Regex Compile | Lazy (once_cell) |
-| File Read | Memory-mapped fuer grosse Dateien |
+| Bereich | Implementierung |
+|--------|-----------------|
+| Regex Compile | Einmal beim Aufbau des Detectors |
+| Normale Dateien | Vollstaendig gelesen, parallel pro Datei |
+| Initialscan | Alle getrackten Index-Blobs via `scan --tracked` |
+| Pre-Commit | Nur geaenderte Index-Blobs via `scan --staged` |
+| Git-Inhalte | Gebuendelt via `git cat-file --batch` |
 | Parallelisierung | rayon |
+
+Konkrete Startup-, Durchsatz- und Speicherziele gelten erst als Zusage, sobald sie durch reproduzierbare Benchmarks in CI abgesichert sind.
 
 ## Datenfluss
 
@@ -103,7 +107,7 @@ Generiert vom Tool, nicht manuell erstellt.
      v
     Core
      |
-     +-- collect files (git staged / paths)
+     +-- collect files (alle/geaenderte Index-Blobs / Dateipfade)
      +-- parallel scan (rayon)
      |   +-- read file
      |   +-- prefilter (aho-corasick)

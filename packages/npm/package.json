@@ -7,7 +7,7 @@
     "type": "git",
     "url": "https://github.com/casoon/nosecrets"
   },
-  "homepage": "https://nosecrets.casoon.de",
+  "homepage": "https://casoon.github.io/nosecrets/",
   "bin": {
     "nosecrets": "bin/nosecrets"
   },

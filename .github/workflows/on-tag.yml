@@ -168,34 +168,3 @@ jobs:
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-
-  crates:
-    needs: verify-ci
-    name: Publish to crates.io
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Publish crates
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          publish_crate() {
-            CRATE="$1"
-            if curl --fail --silent --show-error --user-agent "nosecrets-release-workflow" \
-              "https://crates.io/api/v1/crates/${CRATE}/${VERSION}" >/dev/null; then
-              echo "${CRATE} ${VERSION} already published, skipping."
-              return
-            fi
-            cargo publish -p "$CRATE"
-            sleep 15
-          }
-          publish_crate nosecrets-rules
-          publish_crate nosecrets-filter
-          publish_crate nosecrets-report
-          publish_crate nosecrets-core
-          publish_crate nosecrets-cli

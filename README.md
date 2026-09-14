@@ -194,7 +194,15 @@ git tag v0.3.8
 git push origin v0.3.8
 ```
 
-The tag workflow waits for CI, builds release binaries, publishes the GitHub release, publishes all crates to crates.io, and publishes the npm package with provenance.
+Publish the workspace crates locally in dependency order before creating the tag. The tag workflow then waits for CI, builds release binaries, publishes the GitHub release, and publishes the npm package with provenance.
+
+```bash
+cargo publish -p nosecrets-rules
+cargo publish -p nosecrets-filter
+cargo publish -p nosecrets-report
+cargo publish -p nosecrets-core
+cargo publish -p nosecrets-cli
+```
 
 ## License
 

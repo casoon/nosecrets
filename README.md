@@ -5,7 +5,7 @@
 
 Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, and safe for any GitHub repository.
 
-**Documentation:** [casoon.github.io/nosecrets](https://casoon.github.io/nosecrets/)
+**Website:** [nosecrets.casoon.de](https://nosecrets.casoon.de/en/) · **Documentation:** [casoon.github.io/nosecrets](https://casoon.github.io/nosecrets/)
 
 ## Highlights
 

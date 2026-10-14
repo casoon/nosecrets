@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "type": "flow",
+  "title": "Detection pipeline for one file",
+  "description": "Each file first passes the path filter and is skipped if it is binary. Known formats: a keyword prefilter picks candidate rules, their regular expressions find matches, structural validation checks charset, length and prefix, then rule and repository allowlists, inline markers and fingerprint ignores are applied. Unknown tokens: the entropy detector looks for high-entropy strings, skips those already found by a rule, then applies inline markers, allowed values and fingerprint ignores. What remains is reported as a finding.",
+  "source": "crates/nosecrets-core/src/lib.rs (scan_content), crates/nosecrets-core/src/entropy.rs, crates/nosecrets-filter/src/",
+  "width": 820,
+  "height": 900,
+  "flow": {
+    "lanes": [
+      {
+        "id": "file",
+        "label": "Every file"
+      },
+      {
+        "id": "rules",
+        "label": "Known formats"
+      },
+      {
+        "id": "entropy",
+        "label": "Unknown tokens"
+      },
+      {
+        "id": "out",
+        "label": "Result"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "path",
+        "label": "Path filter",
+        "sublabel": "[ignore].paths, defaults",
+        "lane": "file",
+        "kind": "start"
+      },
+      {
+        "id": "binary",
+        "label": "Skip binary files",
+        "lane": "file"
+      },
+      {
+        "id": "prefilter",
+        "label": "Keyword prefilter",
+        "sublabel": "Aho-Corasick",
+        "lane": "rules"
+      },
+      {
+        "id": "regex",
+        "label": "Rule pattern",
+        "sublabel": "regex match",
+        "lane": "rules"
+      },
+      {
+        "id": "validate",
+        "label": "Validation",
+        "sublabel": "charset, length, prefix",
+        "lane": "rules"
+      },
+      {
+        "id": "allow",
+        "label": "Allowlists",
+        "sublabel": "rule + [allow]",
+        "lane": "rules"
+      },
+      {
+        "id": "high",
+        "label": "High-entropy strings",
+        "sublabel": "near secret-like names",
+        "lane": "entropy"
+      },
+      {
+        "id": "dedupe",
+        "label": "Skip rule matches",
+        "lane": "entropy"
+      },
+      {
+        "id": "ignores",
+        "label": "Inline markers, fingerprints",
+        "sublabel": "@nosecrets-ignore, .nosecretsignore",
+        "lane": "out"
+      },
+      {
+        "id": "finding",
+        "label": "Finding",
+        "sublabel": "severity, nsi_ fingerprint",
+        "lane": "out",
+        "kind": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "path",
+        "to": "binary"
+      },
+      {
+        "from": "binary",
+        "to": "prefilter"
+      },
+      {
+        "from": "prefilter",
+        "to": "regex"
+      },
+      {
+        "from": "regex",
+        "to": "validate"
+      },
+      {
+        "from": "validate",
+        "to": "allow"
+      },
+      {
+        "from": "allow",
+        "to": "ignores"
+      },
+      {
+        "from": "binary",
+        "to": "high"
+      },
+      {
+        "from": "high",
+        "to": "dedupe"
+      },
+      {
+        "from": "dedupe",
+        "to": "ignores"
+      },
+      {
+        "from": "ignores",
+        "to": "finding"
+      }
+    ],
+    "mainPath": [
+      "path",
+      "binary",
+      "prefilter",
+      "regex",
+      "validate",
+      "allow",
+      "ignores",
+      "finding"
+    ],
+    "orientation": "portrait"
+  }
+}

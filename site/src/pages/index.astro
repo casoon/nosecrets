@@ -2,90 +2,152 @@
 import {
   Badge,
   Badges,
+  Button,
   CodeBlock,
   Facts,
   Features,
   Hero,
   Install,
   Quickstart,
-  Terminal,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
+import { url } from '@casoon/pages-theme/url';
+// Animated SVG built with castwright from site/captures/scan.terminal.yaml (real runs, see capture.sh).
+import scanSvg from '../../captures/scan.svg?url';
+import Diagram from '../components/Diagram.astro';
 
-const hook = `repos:
-  - repo: local
-    hooks:
-      - id: nosecrets
-        name: nosecrets
-        entry: nosecrets scan --staged
-        language: system
-        pass_filenames: false`;
+const usage = `nosecrets scan --tracked   # once, for what is already there
+nosecrets scan --staged    # on every commit, in the hook`;
 ---
 
 <Base>
   <Hero
     title="Catch secrets before they become commits."
-    lead="nosecrets scans locally and offline. Run one complete check of the Git index when adopting it, then inspect the exact staged blobs on every commit."
+    lead="An API key pasted into a config file is easy to commit and hard to take back: once it is in Git history, the only fix is to rotate it. nosecrets checks what you are about to commit, on your own machine, and stops the commit if it finds a password, token or key."
   >
     <Install
       commands={[
-        { label: 'curl', command: 'curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh' },
+        {
+          label: 'curl',
+          command: 'curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh',
+        },
         { label: 'npm', command: 'npm install -g @casoon/nosecrets' },
         { label: 'cargo', command: 'cargo install nosecrets-cli' },
       ]}
     />
     <Badges>
-      <Badge>MIT</Badge>
+      <Badge>Free · MIT</Badge>
       <Badge>v0.3.8</Badge>
       <Badge tone="accent">offline</Badge>
-      <Badge>Rust CLI</Badge>
+      <Badge>macOS · Linux · Windows</Badge>
     </Badges>
-    <Terminal
+    <img
       slot="output"
-      title="nosecrets scan --staged"
-      dots
-      ansi={'\u001b[32mNo secrets found\u001b[0m'}
+      class="terminal-demo"
+      src={scanSvg}
+      width="561.6"
+      height="404"
+      alt="Terminal: config.py holds the example keys from the AWS documentation. After git add config.py, nosecrets scan --staged reports 'config.py:3:26 [CRITICAL] AWS Secret Access Key (aws-secret-key)' with the masked preview wJal...EKEY and exits with 1; the example key ID ending in EXAMPLE is not reported. With the secret key read from the environment instead, the same scan prints 'No secrets found' and exits with 0."
     />
   </Hero>
 
+  <Features
+    heading="Who it is for"
+    items={[
+      {
+        title: 'Developers who commit config',
+        body: 'You work with .env files, deploy settings and API clients, and want a safety net for the day a real key slips into a commit.',
+      },
+      {
+        title: 'Teams and open-source maintainers',
+        body: 'One hook in the repository protects every contributor, without an account, a service or a dashboard to look after.',
+      },
+      {
+        title: 'Before the commit, not after',
+        body: 'nosecrets looks at exactly what the next commit would contain. Nothing reaches the history, so there is nothing to clean up.',
+      },
+      {
+        title: 'Exceptions you can review',
+        body: 'A test value or a documented example can be allowed on purpose. Every exception sits in a file in the repository, visible in code review.',
+      },
+    ]}
+  />
+
   <Facts
     items={[
-      { value: '50', label: 'built-in service and generic rules' },
-      { value: '2', label: 'Git index scan modes' },
+      { value: '50', label: 'built-in rules for cloud, code hosts, databases and payment' },
+      { value: '1', label: 'extra check for unknown high-entropy tokens' },
       { value: '0', label: 'network calls while scanning' },
-      { value: '3', label: 'installation methods' },
+      { value: '3', label: 'ways to install: curl, npm, cargo' },
     ]}
   />
 
-  <Features
-    items={[
-      {
-        title: 'Exact staged contents',
-        body: 'The pre-commit scan reads blobs from the Git index, not possibly different files from the working tree.',
-      },
-      {
-        title: 'One complete baseline',
-        body: 'The tracked scan checks every file in the current Git index when you first add nosecrets to an existing repository.',
-      },
-      {
-        title: 'Layered detection',
-        body: 'Known formats use regex, prefilters and validation. Entropy detection covers unknown tokens near secret-related context.',
-      },
-      {
-        title: 'Reviewable exceptions',
-        body: 'Path rules, allowlists, inline markers and stable fingerprints keep false-positive handling explicit.',
-      },
-    ]}
-  />
+  <section class="how" aria-labelledby="how-heading">
+    <h2 id="how-heading">How it works</h2>
+    <div class="text">
+      <p>
+        You add nosecrets to the pre-commit hook. On every <code>git commit</code> it reads the
+        files staged for that commit, checks them for known secret formats and suspicious random
+        tokens, and leaves out anything you marked as intentional.
+      </p>
+      <p>
+        If a secret is left, the commit stops and you see the file, the line and the kind of
+        secret. Everything runs locally: no code is uploaded and no provider is contacted.
+      </p>
+    </div>
+    <Diagram name="how-it-works" format="svg" narrow={{ width: 560, height: 760 }} />
+    <div class="links">
+      <Button href={url('docs/concepts/how-it-works/')} variant="secondary">How it works in detail</Button>
+      <Button href={url('docs/getting-started/configuration/')} variant="secondary">Exceptions and configuration</Button>
+    </div>
+  </section>
 
   <Quickstart
-    lead="Establish a baseline once, then protect every new commit."
+    lead="Check the repository once, then let the hook check every commit."
     steps={[
-      'Install the CLI and run <code>nosecrets scan --tracked</code>.',
-      'Review findings and record intentional exceptions.',
-      'Add <code>nosecrets scan --staged</code> to the pre-commit hook.',
+      'Install nosecrets with one of the lines above.',
+      'Run <code>nosecrets scan --tracked</code> once and review what it finds.',
+      'Add <code>nosecrets scan --staged</code> to your pre-commit hook.',
     ]}
   >
-    <CodeBlock code={hook} lang="yaml" title=".pre-commit-config.yaml" label="YAML" />
+    <CodeBlock code={usage} lang="sh" label="Two commands" />
   </Quickstart>
 </Base>
+
+<style>
+  /* Never scale the SVG beyond a readable terminal size. */
+  .terminal-demo {
+    display: block;
+    width: 100%;
+    max-width: 720px;
+    height: auto;
+    margin: 0 auto;
+  }
+  .how {
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+  h2 {
+    margin: 0 0 14px;
+    color: var(--heading);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .text {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    gap: 0 48px;
+  }
+  .text p {
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+</style>

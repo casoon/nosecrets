@@ -16,8 +16,10 @@ export default defineConfig({
         { label: 'crates.io', href: 'https://crates.io/crates/nosecrets-cli' },
         { label: 'npm', href: 'https://www.npmjs.com/package/@casoon/nosecrets' },
       ],
+      mdxComponents: './src/mdx-components.ts',
       docsGroups: {
         'getting-started': 'Getting started',
+        concepts: 'Concepts',
         reference: 'Reference',
       },
       showcase: false,

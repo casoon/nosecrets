@@ -1,0 +1,52 @@
+---
+title: How it works
+description: What nosecrets reads on each commit, how it decides what is a secret, and how exceptions are applied.
+order: 1
+---
+
+## Exact staged contents
+
+`nosecrets scan --staged` reads the blobs selected for the next commit from the Git index, not
+the files in the working tree. A secret that was staged cannot be hidden by editing or deleting
+the working-tree copy afterwards: the scan sees what the commit would contain.
+
+`nosecrets scan --tracked` reads every tracked blob from the same index. Run it once when adding
+nosecrets to an existing repository to get a complete baseline; it includes committed and staged
+tracked files, excludes untracked files and does not look at history.
+
+## Layered detection
+
+Every file passes the same pipeline (`scan_content` in `crates/nosecrets-core/src/lib.rs`):
+
+<Diagram name="detection" />
+
+- **Known formats.** 50 built-in rules in `crates/nosecrets-rules/rules/` cover cloud providers,
+  deploy platforms, code hosts, messaging, databases, payment and generic patterns. An
+  Aho-Corasick keyword prefilter selects the rules worth running, the rule's regular expression
+  finds candidates, and structural validation (charset, length, prefix) drops values that cannot be
+  the real format.
+- **Unknown tokens.** The entropy detector looks for long, high-entropy strings near names such as
+  `secret`, `token`, `key`, `auth` or `password`. Placeholders like `example` or `changeme` are never
+  flagged, and spans already reported by a rule are not reported twice. Entropy findings use the
+  rule ID `high-entropy-string` with severity `medium`.
+- **Known examples.** Rules can carry their own allowlist. The AWS access key rule, for instance,
+  skips IDs ending in `EXAMPLE` or `SAMPLE`, so the documentation key `AKIAIOSFODNN7EXAMPLE` passes
+  while a secret key next to it is still reported (the start page shows this run).
+
+## Reviewable exceptions
+
+What remains after detection is checked against the exceptions you recorded, from broad to narrow:
+
+- path ignores in `.nosecrets.toml` (`[ignore].paths`, plus built-in defaults such as `.git`,
+  `node_modules`, `target`, `dist`),
+- allowed patterns and values (`[allow]`),
+- inline markers on the line itself (`@nosecrets-ignore`, `@nsi`),
+- stable `nsi_…` fingerprints in `.nosecretsignore`, optionally limited to a path glob.
+
+All of them live in files you commit, so every exception is visible in review. See
+[Configuration](../../getting-started/configuration/) for the syntax.
+
+## Exit codes
+
+- `0`: no blocking findings (only `low` or none).
+- `1`: blocking findings (`critical`, `high` or `medium`). The pre-commit hook stops the commit.

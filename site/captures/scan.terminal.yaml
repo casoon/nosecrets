@@ -1,0 +1,30 @@
+# Plays the captured runs in scan-*.txt and exit-*.txt (see capture.sh): the same file
+# staged twice, first with the secret key inline, then reading it from the environment.
+version: 1
+terminal:
+  title: nosecrets
+  cols: 64
+  rows: 20
+  theme: catppuccin-mocha
+steps:
+  - run: cat config.py
+  - show: fixture/leaky/config.py
+  - run: git add config.py && nosecrets scan --staged
+  - wait: 500
+  - show: scan-leaky.txt
+    lang: text
+  - run: echo $?
+  - show: exit-leaky.txt
+    lang: text
+  - wait: 2500
+  - clear: true
+  - run: cat config.py
+  - show: fixture/fixed/config.py
+  - run: git add config.py && nosecrets scan --staged
+  - wait: 500
+  - show: scan-fixed.txt
+    lang: text
+  - run: echo $?
+  - show: exit-fixed.txt
+    lang: text
+  - wait: 4000

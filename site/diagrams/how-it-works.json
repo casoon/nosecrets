@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "type": "flow",
+  "title": "How nosecrets works",
+  "description": "You run git commit. The pre-commit hook starts nosecrets, which reads the files staged for this commit from the Git index and checks them against 50 built-in rules and an entropy check, leaving out the exceptions you recorded. If a secret is left, the commit is stopped with exit code 1; otherwise it goes on with exit code 0.",
+  "source": "crates/nosecrets-cli/src/main.rs, crates/nosecrets-core/src/lib.rs, crates/nosecrets-rules/rules/",
+  "width": 1100,
+  "height": 300,
+  "flow": {
+    "nodes": [
+      {
+        "id": "commit",
+        "label": "git commit",
+        "kind": "start"
+      },
+      {
+        "id": "staged",
+        "label": "Staged files",
+        "sublabel": "from the Git index",
+        "kind": "io"
+      },
+      {
+        "id": "check",
+        "label": "50 rules + entropy",
+        "sublabel": "minus your exceptions"
+      },
+      {
+        "id": "found",
+        "label": "Secret left?",
+        "kind": "decision"
+      },
+      {
+        "id": "stop",
+        "label": "Commit stopped",
+        "sublabel": "exit code 1",
+        "kind": "end"
+      },
+      {
+        "id": "go",
+        "label": "Commit goes on",
+        "sublabel": "exit code 0",
+        "kind": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "commit",
+        "to": "staged",
+        "label": "pre-commit hook"
+      },
+      {
+        "from": "staged",
+        "to": "check"
+      },
+      {
+        "from": "check",
+        "to": "found"
+      },
+      {
+        "from": "found",
+        "to": "stop",
+        "label": "yes"
+      },
+      {
+        "from": "found",
+        "to": "go",
+        "label": "no"
+      }
+    ],
+    "mainPath": [
+      "commit",
+      "staged",
+      "check",
+      "found",
+      "go"
+    ],
+    "orientation": "landscape"
+  }
+}

@@ -27,4 +27,5 @@ committed; removing it from the latest revision is not enough.
 ## How the docs are organised
 
 - **Getting started**: install nosecrets and add the initial and pre-commit scans.
+- **Concepts**: what is read on each commit, the detection pipeline and how exceptions apply.
 - **Reference**: all CLI switches, configuration and the custom rule format.

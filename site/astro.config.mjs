@@ -12,7 +12,6 @@ export default defineConfig({
       tagline: 'Offline secret scanner for pre-commit',
       website: 'https://nosecrets.casoon.de',
       repo: 'casoon/nosecrets',
-      version: '0.3.8',
       license: 'MIT',
       packages: [
         { label: 'crates.io', href: 'https://crates.io/crates/nosecrets-cli' },

@@ -7,7 +7,7 @@
 # in EXAMPLE and is skipped by the aws-access-key rule; the secret key is reported.
 # The repository's own .nosecrets.toml ignores fixture/ so scans of nosecrets itself pass.
 # Rebuild the scene after a capture:
-#   cd site/captures && npx -y -p @casoon/castwright@0.4.0 -p shiki castwright build scan.terminal.yaml --format svg -o .
+#   cd site/captures && npx -y -p @casoon/castwright@0.5.0 -p shiki castwright build scan.terminal.yaml --format svg -o .
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/../.." && pwd)"

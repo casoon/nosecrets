@@ -35,6 +35,16 @@ NOSECRETS_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/
 npm install -g @casoon/nosecrets
 ```
 
+Official binaries come only from the GitHub releases of `casoon/nosecrets` — built there by the
+release workflow, never on a developer machine. The npm package is published from the same
+workflow with provenance. To verify a downloaded archive by hand, check the hash and the signed
+build provenance:
+
+```sh
+grep " nosecrets-aarch64-apple-darwin.tar.gz" SHA256SUMS | shasum -a 256 -c
+gh attestation verify nosecrets-aarch64-apple-darwin.tar.gz --repo casoon/nosecrets
+```
+
 ### Cargo (Rust)
 
 ```

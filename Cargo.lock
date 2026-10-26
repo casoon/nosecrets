@@ -376,7 +376,7 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "nosecrets-cli"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "anyhow",
  "clap",
@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "nosecrets-core"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -404,7 +404,7 @@ dependencies = [
 
 [[package]]
 name = "nosecrets-filter"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "globset",
  "regex",
@@ -416,7 +416,7 @@ dependencies = [
 
 [[package]]
 name = "nosecrets-report"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "console",
  "hex",
@@ -429,7 +429,7 @@ dependencies = [
 
 [[package]]
 name = "nosecrets-rules"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "serde",
  "thiserror",

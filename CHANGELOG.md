@@ -3,6 +3,13 @@
 All notable changes to this project are documented in this file. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **Contributors:** CI runs `nosecrets scan --tracked` on the repository itself; test fixtures,
+  rule definitions and the synthetic entropy test token are excepted in `.nosecrets.toml`.
+
 ## [0.3.8] - 2026-09-14
 
 ### Added

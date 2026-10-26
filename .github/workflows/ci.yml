@@ -72,6 +72,26 @@ jobs:
       - name: Check workspace
         run: cargo check --workspace --all-targets
 
+  self-scan:
+    name: Self-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Scans every tracked file with the binary built from this commit;
+      # exceptions are documented in .nosecrets.toml.
+      - name: Scan repository with nosecrets
+        run: cargo run --quiet -p nosecrets-cli -- scan --tracked
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

@@ -10,7 +10,6 @@ export default defineConfig({
       name: 'nosecrets',
       description: 'Fast, offline secret scanning for Git pre-commit hooks.',
       tagline: 'Offline secret scanner for pre-commit',
-      website: 'https://nosecrets.casoon.de',
       repo: 'casoon/nosecrets',
       license: 'MIT',
       packages: [

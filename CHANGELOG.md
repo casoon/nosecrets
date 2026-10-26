@@ -5,8 +5,15 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-10-26
+
+### Added
+
+- **Releases:** the binaries carry a signed build provenance attestation (verify with `gh attestation verify`).
+
 ### Changed
 
+- **npm:** `@casoon/nosecrets` is published from the release workflow via Trusted Publishing (provenance, no stored token), after approval in the `npm` environment.
 - **Contributors:** CI runs `nosecrets scan --tracked` on the repository itself; test fixtures,
   rule definitions and the synthetic entropy test token are excepted in `.nosecrets.toml`.
 

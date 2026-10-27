@@ -5,6 +5,10 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
+
 ## [0.3.9] - 2026-10-26
 
 ### Added

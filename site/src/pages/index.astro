@@ -1,17 +1,21 @@
 ---
+import { readFile } from 'node:fs/promises';
 import {
   Badge,
   Badges,
   Button,
   CodeBlock,
   Facts,
+  Faq,
   Features,
   Hero,
   Install,
   Quickstart,
+  ReleaseHighlights,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
 import config from 'virtual:casoon-pages/config';
+import { parseChangelog } from '@casoon/pages-theme/lib/changelog';
 import { url } from '@casoon/pages-theme/url';
 // Animated SVG built with castwright from site/captures/scan.terminal.yaml (real runs, see capture.sh).
 import scanSvg from '../../captures/scan.svg?url';
@@ -19,6 +23,13 @@ import Diagram from '../components/Diagram.astro';
 
 const usage = `nosecrets scan --tracked   # once, for what is already there
 nosecrets scan --staged    # on every commit, in the hook`;
+
+// Skip "Unreleased": it has no version to show as "New in v…" yet.
+const latestRelease = config.changelog
+  ? parseChangelog(await readFile(config.changelog, 'utf8')).find(
+      (r) => r.version.toLowerCase() !== 'unreleased'
+    )
+  : undefined;
 ---
 
 <Base>
@@ -113,6 +124,33 @@ nosecrets scan --staged    # on every commit, in the hook`;
   >
     <CodeBlock code={usage} lang="sh" label="Two commands" />
   </Quickstart>
+
+  {latestRelease && <ReleaseHighlights release={latestRelease} />}
+
+  <Faq
+    items={[
+      {
+        q: 'Does nosecrets scan my Git history?',
+        a: 'No. It is built for the pre-commit moment: scan --staged checks exactly what the next commit would contain, so nothing ever reaches history that needs cleaning up afterwards.',
+      },
+      {
+        q: 'Does it call out to any service while scanning?',
+        a: 'No. nosecrets is offline only — no API calls, no account, no dashboard. Everything runs locally on your own machine.',
+      },
+      {
+        q: 'How do I adopt nosecrets in an existing repository?',
+        a: 'Run nosecrets scan --tracked once to see what the current Git index already holds, then add nosecrets scan --staged to your pre-commit hook so every future commit is checked.',
+      },
+      {
+        q: 'What if it flags a documented example key or test value?',
+        a: 'Allow it on purpose: list the pattern or value under [allow] in .nosecrets.toml, add an inline @nosecrets-ignore comment, or record its fingerprint in .nosecretsignore. Every exception stays visible in the repository and in code review.',
+      },
+      {
+        q: 'Will the high-entropy check flood me with false positives?',
+        a: 'By default it only flags long, random-looking tokens found near secret-related names such as secret, token or password (require_context = true), which keeps unrelated random strings out of the report.',
+      },
+    ]}
+  />
 </Base>
 
 <style>

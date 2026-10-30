@@ -17,4 +17,4 @@ steps:
 
         \  preview: \e[2mhunt...ter2\e[0m\n"
     delay: 8
-  - wait: 3000
+  - wait: 5000

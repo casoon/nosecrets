@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. The format foll
 
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
 
+### Security
+
+- **Site:** the project site builds with Astro 7.4.4 and updated dependencies, which closes the advisories for `devalue`, `vite`, `undici`, `zod`, `source-map-js`, `fast-uri` and Astro itself.
+
 ## [0.3.9] - 2026-10-26
 
 ### Added

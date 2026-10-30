@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. The format foll
 
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
 
+### Security
+
+- **Crates:** `nosecrets-report` uses `sha2` 0.11, so `block-buffer` 0.10.4 (GHSA-qwgh-2vcv-g2f7) is no longer pulled in; fingerprints stay identical, existing `.nosecretsignore` entries keep working.
+
 ## [0.3.9] - 2026-10-26
 
 ### Added

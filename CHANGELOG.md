@@ -8,10 +8,12 @@ All notable changes to this project are documented in this file. The format foll
 ### Changed
 
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
+- **Build:** building from source requires Rust 1.88 (was 1.85), as `sha2` 0.11 needs it.
 
 ### Security
 
 - **Site:** the project site builds with Astro 7.4.4 and updated dependencies, which closes the advisories for `devalue`, `vite`, `undici`, `zod`, `source-map-js`, `fast-uri` and Astro itself.
+- **Crates:** `nosecrets-report` uses `sha2` 0.11, so `block-buffer` 0.10.4 (GHSA-qwgh-2vcv-g2f7) is no longer pulled in; fingerprints stay identical, existing `.nosecretsignore` entries keep working.
 
 ## [0.3.9] - 2026-10-26
 

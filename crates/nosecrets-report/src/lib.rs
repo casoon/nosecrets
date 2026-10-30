@@ -156,6 +156,17 @@ mod tests {
     }
 
     #[test]
+    fn fingerprint_matches_known_value() {
+        // Existing .nosecretsignore entries depend on this exact value.
+        assert_eq!(fingerprint_secret("secret"), "nsi_2bb80d537b1d");
+        assert_eq!(
+            // Split, so the repository's self-scan does not flag this test.
+            fingerprint_secret(&["ghp_", "1234567890abcdefghijklmnopqrstuvwxyz"].concat()),
+            "nsi_1db61e13c133"
+        );
+    }
+
+    #[test]
     fn mask_secret_obscures_middle() {
         assert_eq!(mask_secret(""), "");
         assert_eq!(mask_secret("short"), "*****");

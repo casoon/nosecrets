@@ -1,0 +1,22 @@
+# Rebuild: npx @casoon/castwright build examples/readme-demo.terminal.yaml -o .github/readme --format svg --loop-delay 5000
+# (the final frame holds for --loop-delay; a trailing wait: is dropped in the SVG export. Output below is recorded.)
+version: 1
+
+terminal:
+  title: nosecrets
+  cols: 96
+  rows: 7
+  theme: catppuccin-mocha
+
+steps:
+  - run: nosecrets scan src/
+  - output:
+      raw: "src/payments.js:3:24 [\e[31m\e[1mCRITICAL\e[0m] Stripe Secret Key (stripe-secret-key) \e[2mnsi_f00d558a91ad\e[0m
+
+        \  preview: \e[2msk_l...0000\e[0m
+
+        src/payments.js:4:30 [\e[31mHIGH\e[0m] Postgres Connection URI (postgres-connection-uri) \e[2mnsi_76880d60191a\e[0m
+
+        \  preview: \e[2mhunt...ter2\e[0m\n"
+    delay: 8
+  - wait: 5000

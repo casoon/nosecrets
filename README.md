@@ -15,6 +15,8 @@ Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, an
 - High-entropy detection for unknown secrets
 - Minimal configuration
 
+<p align="center"><img src=".github/readme/demo.svg" alt="nosecrets scan src/ reports a Stripe secret key as critical and a Postgres connection URI as high, each with a fingerprint and a masked preview." width="830"></p>
+
 ## Install
 
 ### curl (Apple Silicon macOS and Linux)

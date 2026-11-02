@@ -7,6 +7,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Changed
 
+- **Pages:** the project site uses the current shared theme (0.12.5).
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
 - **Build:** building from source requires Rust 1.88 (was 1.85), as `sha2` 0.11 needs it.
 

@@ -34,7 +34,10 @@ pub enum ReportError {
 
 impl Report {
     pub fn new(findings: Vec<Finding>) -> Self {
-        let deduped = dedup_findings(findings);
+        let mut deduped = dedup_findings(findings);
+        deduped.sort_by(|a, b| {
+            (&a.path, a.line, a.column, &a.rule_id).cmp(&(&b.path, b.line, b.column, &b.rule_id))
+        });
         Self { findings: deduped }
     }
 
@@ -103,25 +106,21 @@ pub fn fingerprint_secret(secret: &str) -> String {
     format!("nsi_{}", &hex[..12])
 }
 
+/// Masks a secret for display. At most a quarter of the characters is revealed, never more
+/// than four at each end; short secrets are hidden completely.
 pub fn mask_secret(secret: &str) -> String {
-    if secret.is_empty() {
-        return "".to_string();
-    }
     let chars: Vec<char> = secret.chars().collect();
-    if chars.len() <= 8 {
-        return "*".repeat(chars.len());
+    let len = chars.len();
+    if len < 12 {
+        return "*".repeat(len);
     }
-    let start: String = chars.iter().take(4).collect();
-    let end: String = chars
-        .iter()
-        .rev()
-        .take(4)
-        .copied()
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect();
-    format!("{}...{}", start, end)
+    let prefix: String = chars.iter().take((len / 4).min(4)).collect();
+    if len < 32 {
+        // Prefix only: a suffix as well would exceed a quarter of the secret.
+        return format!("{prefix}...");
+    }
+    let suffix: String = chars[len - 4..].iter().collect();
+    format!("{prefix}...{suffix}")
 }
 
 fn dedup_findings(findings: Vec<Finding>) -> Vec<Finding> {
@@ -167,16 +166,26 @@ mod tests {
     }
 
     #[test]
-    fn mask_secret_obscures_middle() {
+    fn mask_secret_reveals_at_most_a_quarter() {
         assert_eq!(mask_secret(""), "");
         assert_eq!(mask_secret("short"), "*****");
-        assert_eq!(mask_secret("longsecret"), "long...cret");
+        assert_eq!(mask_secret("hunter2ab"), "*********");
+        assert_eq!(mask_secret("abcdefghijkl"), "abc...");
+        assert_eq!(mask_secret("abcdefghijklmnop"), "abcd...");
+        for len in [8, 9, 12, 16, 31, 32, 40, 200] {
+            let secret: String = ('a'..='z').cycle().take(len).collect();
+            let masked = mask_secret(&secret);
+            let revealed = masked.chars().filter(|c| c.is_ascii_lowercase()).count();
+            assert!(revealed * 4 <= len, "{len} chars: {masked}");
+        }
+        let long: String = ('a'..='z').cycle().take(40).collect();
+        assert_eq!(mask_secret(&long), "abcd...klmn");
     }
 
     #[test]
     fn mask_secret_handles_unicode() {
-        assert_eq!(mask_secret("абвгдежзи"), "абвг...ежзи");
-        assert_eq!(mask_secret("„quoted-secret-სიმბოლოები"), "„quo...ოები");
+        assert_eq!(mask_secret("абвгдежзи"), "*********");
+        assert_eq!(mask_secret("„quoted-secret-სიმბოლოები"), "„quo...");
     }
 
     #[test]
@@ -194,5 +203,26 @@ mod tests {
         let report = Report::new(vec![finding.clone(), finding]);
         assert_eq!(report.findings().len(), 1);
         assert_eq!(report.exit_code(), 1);
+    }
+
+    #[test]
+    fn report_sorts_findings() {
+        let finding = |path: &str, line: usize| Finding {
+            path: path.to_string(),
+            line,
+            column: 1,
+            rule_id: "test".to_string(),
+            rule_name: "Test".to_string(),
+            severity: Severity::Low,
+            fingerprint: format!("nsi_{path}{line}"),
+            preview: String::new(),
+        };
+        let report = Report::new(vec![finding("b", 1), finding("a", 9), finding("a", 2)]);
+        let order: Vec<(&str, usize)> = report
+            .findings()
+            .iter()
+            .map(|finding| (finding.path.as_str(), finding.line))
+            .collect();
+        assert_eq!(order, vec![("a", 2), ("a", 9), ("b", 1)]);
     }
 }

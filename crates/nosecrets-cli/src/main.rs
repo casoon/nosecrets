@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
-use nosecrets_core::{collect_files, discover_repo_root, Detector};
+use nosecrets_core::{discover_repo_root, Detector};
 use nosecrets_filter::{load_ignore_file, normalize_path, Config, Filter};
 use nosecrets_report::Report;
 use nosecrets_rules::{load_builtin_rules, parse_rules};
@@ -67,15 +67,25 @@ enum OutputFormat {
     Json,
 }
 
-fn main() -> Result<()> {
+/// Exit code for a scan that could not be completed, as opposed to `1` for blocking findings.
+const EXIT_ERROR: i32 = 2;
+
+fn main() {
     let cli = Cli::parse();
-    match cli.command {
+    let result = match cli.command {
         Commands::Scan(args) => run_scan(args),
-        Commands::Ignore(args) => run_ignore(args),
+        Commands::Ignore(args) => run_ignore(args).map(|()| 0),
+    };
+    match result {
+        Ok(code) => std::process::exit(code),
+        Err(error) => {
+            eprintln!("Error: {error:#}");
+            std::process::exit(EXIT_ERROR);
+        }
     }
 }
 
-fn run_scan(args: ScanArgs) -> Result<()> {
+fn run_scan(args: ScanArgs) -> Result<i32> {
     let cwd = std::env::current_dir().context("failed to read current dir")?;
     let repo_root = discover_repo_root(&cwd)?;
     let root = repo_root.clone().unwrap_or(cwd);
@@ -112,7 +122,7 @@ fn run_scan(args: ScanArgs) -> Result<()> {
             detector.scan_tracked_files(&repo_root)?
         }
     } else {
-        let files = collect_files(&root, &args.paths)?;
+        let files = detector.collect_files(&root, &args.paths)?;
         detector.scan_files(&root, &files)?
     };
     let findings = if args.interactive {
@@ -126,8 +136,11 @@ fn run_scan(args: ScanArgs) -> Result<()> {
         OutputFormat::Text => report.print_terminal()?,
         OutputFormat::Json => report.print_json()?,
     }
-    let exit_code = if args.dry_run { 0 } else { report.exit_code() };
-    std::process::exit(exit_code);
+    let skipped = detector.skipped_large_files();
+    if skipped > 0 {
+        eprintln!("skipped {skipped} file(s) larger than the configured scan.max_file_size");
+    }
+    Ok(if args.dry_run { 0 } else { report.exit_code() })
 }
 
 fn run_ignore(args: IgnoreArgs) -> Result<()> {

@@ -4,7 +4,15 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use thiserror::Error;
+
+/// Inline ignore markers count only as standalone tokens: after the start of the line,
+/// whitespace or a comment opener, and not followed by a word character.
+static INLINE_IGNORE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?:^|[\s#/*;!-])(?:@nosecrets-ignore|@nsi|gitleaks:allow)(?:$|\W)")
+        .expect("inline ignore regex")
+});
 
 const DEFAULT_IGNORE_PATHS: &[&str] = &[
     "**/.git/**",
@@ -24,6 +32,7 @@ const DEFAULT_IGNORE_PATHS: &[&str] = &[
 ];
 
 #[derive(Debug, Deserialize, Default, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub ignore: IgnoreConfig,
@@ -31,15 +40,39 @@ pub struct Config {
     pub allow: AllowConfig,
     #[serde(default)]
     pub entropy: EntropyConfig,
+    #[serde(default)]
+    pub scan: ScanConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct ScanConfig {
+    /// Files larger than this many bytes are skipped; `0` disables the limit.
+    #[serde(default = "default_max_file_size")]
+    pub max_file_size: u64,
+}
+
+impl Default for ScanConfig {
+    fn default() -> Self {
+        Self {
+            max_file_size: default_max_file_size(),
+        }
+    }
+}
+
+fn default_max_file_size() -> u64 {
+    5 * 1024 * 1024
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct IgnoreConfig {
     #[serde(default)]
     pub paths: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct AllowConfig {
     #[serde(default)]
     pub patterns: Vec<String>,
@@ -48,6 +81,7 @@ pub struct AllowConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct EntropyConfig {
     #[serde(default = "entropy_default_enabled")]
     pub enabled: bool,
@@ -90,6 +124,7 @@ fn entropy_default_require_context() -> bool {
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct EntropyAllowConfig {
     #[serde(default)]
     pub patterns: Vec<String>,
@@ -107,6 +142,7 @@ pub struct Filter {
     allow_patterns: Vec<Regex>,
     allow_values: HashSet<String>,
     ignore_entries: Vec<IgnoreEntry>,
+    max_file_size: u64,
 }
 
 #[derive(Debug, Error)]
@@ -239,6 +275,7 @@ impl Filter {
             allow_patterns,
             allow_values,
             ignore_entries,
+            max_file_size: config.scan.max_file_size,
         })
     }
 
@@ -248,6 +285,16 @@ impl Filter {
         };
         let normalized = normalize_path(path);
         globset.is_match(normalized)
+    }
+
+    /// True if everything below the directory is ignored, so a walk need not descend into it.
+    pub fn is_dir_ignored(&self, dir: &Path) -> bool {
+        self.is_path_ignored(&dir.join("\u{1}nosecrets-probe\u{1}"))
+    }
+
+    /// Size limit in bytes for scanned files; `None` when the limit is disabled.
+    pub fn max_file_size(&self) -> Option<u64> {
+        (self.max_file_size > 0).then_some(self.max_file_size)
     }
 
     pub fn is_value_allowed(&self, value: &str) -> bool {
@@ -273,7 +320,7 @@ impl Filter {
     }
 
     pub fn is_inline_ignored(line: &str) -> bool {
-        line.contains("@nosecrets-ignore") || line.contains("@nsi")
+        INLINE_IGNORE.is_match(line)
     }
 }
 
@@ -344,7 +391,44 @@ mod tests {
             "key = \"secret\" # @nosecrets-ignore"
         ));
         assert!(Filter::is_inline_ignored("// @nsi test"));
+        assert!(Filter::is_inline_ignored("x = 1 # @nsi"));
+        assert!(Filter::is_inline_ignored("@nsi"));
+        assert!(Filter::is_inline_ignored("x = 1; /* @nosecrets-ignore */"));
+        assert!(Filter::is_inline_ignored("<!--@nsi-->"));
+        assert!(Filter::is_inline_ignored("key: value # gitleaks:allow"));
         assert!(!Filter::is_inline_ignored("no ignore here"));
+    }
+
+    #[test]
+    fn inline_ignore_requires_a_standalone_marker() {
+        assert!(!Filter::is_inline_ignored("contact = \"bob@nsight.io\""));
+        assert!(!Filter::is_inline_ignored("mail user@nsi.example"));
+        assert!(!Filter::is_inline_ignored("foo@nsiX"));
+        assert!(!Filter::is_inline_ignored("# @nsight"));
+        assert!(!Filter::is_inline_ignored("nogitleaks:allowed"));
+    }
+
+    #[test]
+    fn unknown_config_keys_are_rejected() {
+        let dir = tempdir().expect("tempdir");
+        fs::write(
+            dir.path().join(".nosecrets.toml"),
+            "[entropy]\ntreshold = 9.9\n",
+        )
+        .expect("write config");
+        let error = Config::load_from_dir(dir.path()).expect_err("must fail");
+        assert!(format!("{error:?}").contains("treshold"));
+    }
+
+    #[test]
+    fn ignored_directories_are_recognised() {
+        let mut config = Config::default();
+        config.ignore.paths = vec!["vendor/".to_string(), "gen/*.js".to_string()];
+        let filter = Filter::from_config(Some(config), Vec::new()).expect("build filter");
+        assert!(filter.is_dir_ignored(Path::new("vendor")));
+        assert!(filter.is_dir_ignored(Path::new("web/node_modules")));
+        assert!(!filter.is_dir_ignored(Path::new("gen")));
+        assert!(!filter.is_dir_ignored(Path::new("src")));
     }
 
     #[test]

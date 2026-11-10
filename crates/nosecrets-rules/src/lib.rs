@@ -15,6 +15,16 @@ impl Severity {
         matches!(self, Severity::Critical | Severity::High | Severity::Medium)
     }
 
+    /// Higher means more severe.
+    pub fn rank(self) -> u8 {
+        match self {
+            Severity::Critical => 3,
+            Severity::High => 2,
+            Severity::Medium => 1,
+            Severity::Low => 0,
+        }
+    }
+
     pub fn as_str(self) -> &'static str {
         match self {
             Severity::Critical => "critical",
@@ -26,6 +36,7 @@ impl Severity {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rule {
     pub id: String,
     pub name: String,
@@ -35,6 +46,10 @@ pub struct Rule {
     pub keywords: Vec<String>,
     #[serde(default = "default_capture")]
     pub capture: usize,
+    /// Marks a catch-all rule. When it matches the same text as a specific rule of equal
+    /// severity, the specific rule is reported.
+    #[serde(default)]
+    pub generic: bool,
     #[serde(default)]
     pub validate: Option<RuleValidate>,
     #[serde(default)]
@@ -48,6 +63,7 @@ fn default_capture() -> usize {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RuleValidate {
     #[serde(default)]
     pub prefix: Vec<String>,
@@ -58,6 +74,7 @@ pub struct RuleValidate {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RulePaths {
     #[serde(default)]
     pub include: Vec<String>,
@@ -66,6 +83,7 @@ pub struct RulePaths {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct RuleAllow {
     #[serde(default)]
     pub patterns: Vec<String>,
@@ -74,6 +92,7 @@ pub struct RuleAllow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RulesFile {
     #[serde(default)]
     rule: Vec<Rule>,
@@ -86,6 +105,12 @@ pub enum RulesError {
         source: String,
         #[source]
         error: toml::de::Error,
+    },
+    #[error("invalid rule {id:?} in {file}: {reason}")]
+    Invalid {
+        file: String,
+        id: String,
+        reason: &'static str,
     },
 }
 
@@ -130,6 +155,24 @@ pub fn parse_rules(content: &str, source: &str) -> Result<Vec<Rule>, RulesError>
         source: source.to_string(),
         error,
     })?;
+    for rule in &parsed.rule {
+        let reason = if rule.id.trim().is_empty() {
+            "id is empty"
+        } else if rule.pattern.is_empty() {
+            "pattern is empty"
+        } else if rule.validate.as_ref().is_some_and(|validate| {
+            matches!((validate.min_length, validate.max_length), (Some(min), Some(max)) if min > max)
+        }) {
+            "min_length is greater than max_length"
+        } else {
+            continue;
+        };
+        return Err(RulesError::Invalid {
+            file: source.to_string(),
+            id: rule.id.clone(),
+            reason,
+        });
+    }
     Ok(parsed.rule)
 }
 
@@ -154,5 +197,50 @@ mod tests {
         assert_eq!(rule.severity, Severity::High);
         assert_eq!(rule.capture, 1);
         assert_eq!(rule.keywords.len(), 0);
+    }
+
+    #[test]
+    fn builtin_rules_load() {
+        assert!(!load_builtin_rules().expect("builtin rules").is_empty());
+    }
+
+    #[test]
+    fn unknown_keys_are_rejected() {
+        let misspelled_keywords = r#"
+            [[rule]]
+            id = "test"
+            name = "Test Rule"
+            severity = "high"
+            pattern = "(test_[a-z]+)"
+            keyword = ["test_"]
+        "#;
+        let error = parse_rules(misspelled_keywords, "inline").expect_err("must fail");
+        assert!(format!("{error:?}").contains("keyword"));
+
+        let misspelled_validate = r#"
+            [[rule]]
+            id = "test"
+            name = "Test Rule"
+            severity = "high"
+            pattern = "(test_[a-z]+)"
+
+            [rule.validate]
+            lenght = 10
+        "#;
+        let error = parse_rules(misspelled_validate, "inline").expect_err("must fail");
+        assert!(format!("{error:?}").contains("lenght"));
+    }
+
+    #[test]
+    fn inconsistent_rules_are_rejected() {
+        let rule = |id: &str, pattern: &str, validate: &str| {
+            format!(
+                "[[rule]]\nid = \"{id}\"\nname = \"T\"\nseverity = \"high\"\npattern = \"{pattern}\"\n{validate}"
+            )
+        };
+        assert!(parse_rules(&rule("", "(a)", ""), "inline").is_err());
+        assert!(parse_rules(&rule("x", "", ""), "inline").is_err());
+        let bounds = "[rule.validate]\nmin_length = 9\nmax_length = 3\n";
+        assert!(parse_rules(&rule("x", "(a)", bounds), "inline").is_err());
     }
 }

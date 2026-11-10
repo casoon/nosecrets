@@ -24,7 +24,8 @@ capture = 1
 ```
 
 The pattern must contain the configured capture group. Rule IDs must be unique across built-in and
-custom rules.
+custom rules. Unknown keys, an empty `id` or `pattern`, and a `min_length` above `max_length` are
+errors.
 
 ## Optional validation and filters
 
@@ -48,6 +49,7 @@ values = ["int_000000000000000000000000"]
 | `severity` | `critical`, `high`, `medium` or `low` |
 | `keywords` | Cheap prefilter terms checked before the regex |
 | `capture` | Secret capture group; defaults to 1 |
+| `generic` | `true` for a catch-all rule; a specific rule of the same severity matching the same text is reported instead |
 | `validate.prefix` | Accepted prefixes |
 | `validate.charset` | Regex character class applied to the captured value |
 | `validate.length` | Exact captured length |

@@ -13,6 +13,7 @@ exclude = ["*.pub", "*.crt", "*.cer"]
 
 [[rule]]
 id = "generic-api-key"
+generic = true
 name = "Generic API Key"
 severity = "medium"
 pattern = '''(?i)(?:api[_-]?key|apikey)\s*[=:]\s*['\"]?([A-Za-z0-9_-]{20,})['\"]?'''
@@ -28,6 +29,7 @@ patterns = ["^[A-Z_]+$", "example", "your.*here"]
 
 [[rule]]
 id = "generic-secret"
+generic = true
 name = "Generic Secret"
 severity = "medium"
 pattern = '''(?i)(?:secret|client.?secret)\s*[=:]\s*['\"]?([A-Za-z0-9_-]{16,})['\"]?'''
@@ -43,6 +45,7 @@ patterns = ["^[A-Z_]+$", "example", "changeme", "xxx"]
 
 [[rule]]
 id = "password-assignment"
+generic = true
 name = "Password Assignment"
 severity = "medium"
 pattern = '''(?i)(?:password|passwd|pwd)\s*[=:]\s*['\"]([^'\"]{8,})['\"]'''

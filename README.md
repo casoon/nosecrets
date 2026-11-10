@@ -79,6 +79,7 @@ For an existing repository, run `nosecrets scan --tracked` once when adopting th
 
 - 0: no blocking findings (only low or none)
 - 1: blocking findings (critical/high/medium)
+- 2: the scan could not run, for example an invalid configuration, a path that does not exist or `--staged` outside a Git repository
 
 ## Configuration
 
@@ -102,7 +103,12 @@ patterns = [
 values = [
   "AKIAIOSFODNN7EXAMPLE",
 ]
+
+[scan]
+max_file_size = 5242880
 ```
+
+Files larger than `max_file_size` bytes (default 5 MiB) are skipped and counted in a note on stderr; `0` removes the limit. Unknown keys in `.nosecrets.toml` are an error, so a misspelled option cannot go unnoticed.
 
 ### High-entropy detection
 
@@ -146,7 +152,10 @@ nsi_b2c3d4e5f6a7:src/config.py
 ```
 api_key = "sk_test_xxx"  # @nosecrets-ignore
 api_key = "sk_test_xxx"  # @nsi example key
+api_key = "sk_test_xxx"  # gitleaks:allow
 ```
+
+A marker counts only as a separate word in a comment; `@nsi` inside an e-mail address or another word does not suppress anything.
 
 ## Default rules
 
@@ -178,16 +187,32 @@ nosecrets can produce false positives — especially the entropy-based detection
 
 ## Pre-commit integration
 
-Example `.pre-commit-hooks.yaml` entry:
+With [pre-commit](https://pre-commit.com/) or [prek](https://github.com/j178/prek), using the
+installed `nosecrets` binary:
 
+```yaml
+repos:
+  - repo: https://github.com/casoon/nosecrets
+    rev: v0.4.0 # a release tag
+    hooks:
+      - id: nosecrets-system
 ```
-- repo: local
-  hooks:
-    - id: nosecrets
-      name: nosecrets
-      entry: nosecrets scan --staged
-      language: system
-      pass_filenames: false
+
+With [lefthook](https://lefthook.dev/) (`lefthook.yml`):
+
+```yaml
+pre-commit:
+  commands:
+    nosecrets:
+      run: nosecrets scan --staged
+```
+
+With [husky](https://typicode.github.io/husky/) (`.husky/pre-commit`) or as a plain
+`.git/hooks/pre-commit` script:
+
+```sh
+#!/bin/sh
+nosecrets scan --staged
 ```
 
 ## Development

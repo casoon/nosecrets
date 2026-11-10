@@ -1,8 +1,14 @@
 - id: nosecrets
   name: nosecrets
-  description: Detect secrets in staged files
+  description: Detect secrets in staged files (builds nosecrets from source)
   entry: nosecrets scan --staged
   language: rust
-  types: [text]
+  stages: [pre-commit]
+  pass_filenames: false
+- id: nosecrets-system
+  name: nosecrets
+  description: Detect secrets in staged files (uses the nosecrets binary on PATH)
+  entry: nosecrets scan --staged
+  language: system
   stages: [pre-commit]
   pass_filenames: false

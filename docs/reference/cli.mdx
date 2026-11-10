@@ -40,5 +40,9 @@ restricts the fingerprint to a path glob.
 
 - `0`: no critical, high or medium findings; low-severity findings may still be shown.
 - `1`: at least one critical, high or medium finding.
-- Other non-zero status: nosecrets could not complete the scan, for example because a file or Git
-  object could not be read or configuration was invalid.
+- `2`: nosecrets could not complete the scan, for example because a path does not exist, a file or
+  Git object could not be read, the configuration was invalid or `--staged` ran outside a Git
+  repository. `--dry-run` does not change this status.
+
+When several rules match the same text, the most severe one is reported; findings are listed in
+order of path, line and column.

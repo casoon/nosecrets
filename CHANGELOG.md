@@ -5,8 +5,24 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Breaking
+
+- **CLI:** a scan that cannot run exits with status 2 instead of 1; status 1 now always means blocking findings. A path that does not exist is such an error instead of a clean result.
+- **Configuration:** unknown keys in `.nosecrets.toml` and in rule files are errors, as are rules with an empty `id` or `pattern` or with `min_length` above `max_length`.
+- **Inline ignores:** `@nsi` and `@nosecrets-ignore` count only as separate words; the same characters inside an e-mail address or another word no longer suppress the findings of that line.
+
+### Added
+
+- **Configuration:** `[scan] max_file_size` skips files above a size limit (default 5 MiB) and reports how many were skipped. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
+- **Inline ignores:** `gitleaks:allow` is accepted as a marker.
+- **pre-commit:** hook `nosecrets-system` runs the installed binary.
+- **Rules:** optional field `generic` marks catch-all rules.
+
 ### Changed
 
+- **Output:** when several rules match the same text, only the most severe one is reported, and a specific rule wins over a generic one; findings are sorted by path, line and column.
+- **Output:** the preview reveals at most a quarter of a secret and nothing of secrets shorter than 12 characters. Fingerprints are unchanged.
+- **Scanning:** ignored directories are no longer read; path scans skip them without descending.
 - **Pages:** the project site uses the current shared theme (0.12.6).
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
 - **Build:** building from source requires Rust 1.88 (was 1.85), as `sha2` 0.11 needs it.

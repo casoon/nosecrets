@@ -17,15 +17,32 @@ history. Review any findings before enabling the hook.
 
 ## 2. Add the pre-commit scan
 
+With [pre-commit](https://pre-commit.com/) or [prek](https://github.com/j178/prek), using the
+installed `nosecrets` binary:
+
 ```yaml
 repos:
-  - repo: local
+  - repo: https://github.com/casoon/nosecrets
+    rev: v0.4.0 # a release tag
     hooks:
-      - id: nosecrets
-        name: nosecrets
-        entry: nosecrets scan --staged
-        language: system
-        pass_filenames: false
+      - id: nosecrets-system
+```
+
+With [lefthook](https://lefthook.dev/) (`lefthook.yml`):
+
+```yaml
+pre-commit:
+  commands:
+    nosecrets:
+      run: nosecrets scan --staged
+```
+
+With [husky](https://typicode.github.io/husky/) (`.husky/pre-commit`) or as a plain
+`.git/hooks/pre-commit` script:
+
+```sh
+#!/bin/sh
+nosecrets scan --staged
 ```
 
 `--staged` reads the exact blobs selected for the next commit, even when the same files contain

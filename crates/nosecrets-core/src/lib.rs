@@ -4,8 +4,10 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, ChildStdout, Command, Output, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::thread::JoinHandle;
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 use anyhow::{anyhow, Context, Result};
@@ -23,6 +25,14 @@ pub struct Detector {
     filter: Arc<Filter>,
     entropy_config: EntropyConfig,
     entropy_allow_patterns: Vec<Regex>,
+    skipped_large_files: AtomicUsize,
+}
+
+struct RegexHit {
+    start: usize,
+    end: usize,
+    rule_idx: usize,
+    finding: Finding,
 }
 
 struct CompiledRule {
@@ -80,7 +90,7 @@ impl Detector {
             });
         }
         let compiled = Arc::new(compiled);
-        let prefilter = Prefilter::new(&compiled);
+        let prefilter = Prefilter::new(&compiled)?;
 
         let mut entropy_allow = Vec::new();
         for pattern in &entropy_config.allow.patterns {
@@ -96,6 +106,20 @@ impl Detector {
             filter: Arc::new(filter),
             entropy_config,
             entropy_allow_patterns: entropy_allow,
+            skipped_large_files: AtomicUsize::new(0),
+        })
+    }
+
+    /// Number of files skipped so far because they exceed the configured size limit.
+    pub fn skipped_large_files(&self) -> usize {
+        self.skipped_large_files.load(Ordering::Relaxed)
+    }
+
+    /// Like [`collect_files`], but does not descend into ignored directories.
+    pub fn collect_files(&self, root: &Path, inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
+        walk_inputs(root, inputs, &|dir| {
+            self.filter
+                .is_dir_ignored(dir.strip_prefix(root).unwrap_or(dir))
         })
     }
 
@@ -108,16 +132,21 @@ impl Detector {
     }
 
     pub fn scan_staged_files(&self, repo_root: &Path) -> Result<Vec<Finding>> {
-        let files = collect_staged_blobs(repo_root)?;
-        self.scan_git_blobs(repo_root, &files)
+        let files = list_staged_blobs(repo_root)?;
+        self.scan_git_blobs(repo_root, files)
     }
 
     pub fn scan_tracked_files(&self, repo_root: &Path) -> Result<Vec<Finding>> {
-        let files = collect_tracked_blobs(repo_root)?;
-        self.scan_git_blobs(repo_root, &files)
+        let files = list_tracked_blobs(repo_root)?;
+        self.scan_git_blobs(repo_root, files)
     }
 
-    fn scan_git_blobs(&self, repo_root: &Path, files: &[GitBlob]) -> Result<Vec<Finding>> {
+    fn scan_git_blobs(&self, repo_root: &Path, mut files: Vec<GitBlob>) -> Result<Vec<Finding>> {
+        files.retain(|file| !self.filter.is_path_ignored(&file.path));
+        let listed = files.len();
+        let files = load_git_blob_contents(repo_root, files, self.filter.max_file_size())?;
+        self.skipped_large_files
+            .fetch_add(listed - files.len(), Ordering::Relaxed);
         let findings: Result<Vec<Vec<Finding>>> = files
             .par_iter()
             .map(|file| self.scan_content(repo_root, &file.path, &file.content))
@@ -126,24 +155,33 @@ impl Detector {
     }
 
     fn scan_file(&self, root: &Path, path: &Path) -> Result<Vec<Finding>> {
+        if self
+            .filter
+            .is_path_ignored(path.strip_prefix(root).unwrap_or(path))
+        {
+            return Ok(Vec::new());
+        }
+        if let Some(max) = self.filter.max_file_size() {
+            let size = fs::metadata(path)
+                .with_context(|| format!("reading {}", path.display()))?
+                .len();
+            if size > max {
+                self.skipped_large_files.fetch_add(1, Ordering::Relaxed);
+                return Ok(Vec::new());
+            }
+        }
         let content = fs::read(path).with_context(|| format!("reading {}", path.display()))?;
         self.scan_content(root, path, &content)
     }
 
     fn scan_content(&self, root: &Path, path: &Path, content: &[u8]) -> Result<Vec<Finding>> {
         let rel_path = path.strip_prefix(root).unwrap_or(path);
-        if self.filter.is_path_ignored(rel_path) {
-            return Ok(Vec::new());
-        }
         if content.contains(&0) {
             return Ok(Vec::new());
         }
         let text = String::from_utf8_lossy(content);
         let line_starts = build_line_starts(&text);
-        let mut findings = Vec::new();
-
-        // Collect byte spans covered by regex findings for deduplication
-        let mut regex_spans: Vec<(usize, usize)> = Vec::new();
+        let mut hits = Vec::new();
 
         // Phase 1: Regex-based detection
         let candidate_rules = self.prefilter.candidates(&text);
@@ -172,19 +210,27 @@ impl Detector {
                 if self.filter.is_fingerprint_ignored(&fingerprint, rel_path) {
                     continue;
                 }
-                regex_spans.push((matched.start(), matched.end()));
-                findings.push(Finding {
-                    path: normalize_path(rel_path),
-                    line,
-                    column,
-                    rule_id: rule.rule.id.clone(),
-                    rule_name: rule.rule.name.clone(),
-                    severity: rule.rule.severity,
-                    fingerprint,
-                    preview: mask_secret(secret),
+                hits.push(RegexHit {
+                    start: matched.start(),
+                    end: matched.end(),
+                    rule_idx,
+                    finding: Finding {
+                        path: normalize_path(rel_path),
+                        line,
+                        column,
+                        rule_id: rule.rule.id.clone(),
+                        rule_name: rule.rule.name.clone(),
+                        severity: rule.rule.severity,
+                        fingerprint,
+                        preview: mask_secret(secret),
+                    },
                 });
             }
         }
+        let hits = self.best_hit_per_span(hits);
+        let regex_spans: Vec<(usize, usize)> =
+            hits.iter().map(|hit| (hit.start, hit.end)).collect();
+        let mut findings: Vec<Finding> = hits.into_iter().map(|hit| hit.finding).collect();
 
         // Phase 2: Entropy-based detection
         if self.entropy_config.enabled {
@@ -226,6 +272,33 @@ impl Detector {
 
         Ok(findings)
     }
+
+    /// Keeps one hit per overlapping span: the more severe rule wins, then a specific rule
+    /// over a generic one, then the longer match, then the rule id.
+    fn best_hit_per_span(&self, mut hits: Vec<RegexHit>) -> Vec<RegexHit> {
+        hits.sort_by(|a, b| {
+            let (rule_a, rule_b) = (&self.rules[a.rule_idx].rule, &self.rules[b.rule_idx].rule);
+            rule_b
+                .severity
+                .rank()
+                .cmp(&rule_a.severity.rank())
+                .then(rule_a.generic.cmp(&rule_b.generic))
+                .then((b.end - b.start).cmp(&(a.end - a.start)))
+                .then(rule_a.id.cmp(&rule_b.id))
+                .then(a.start.cmp(&b.start))
+        });
+        let mut kept: Vec<RegexHit> = Vec::new();
+        for hit in hits {
+            if !kept
+                .iter()
+                .any(|other| hit.start < other.end && hit.end > other.start)
+            {
+                kept.push(hit);
+            }
+        }
+        kept.sort_by_key(|hit| hit.start);
+        kept
+    }
 }
 
 impl CompiledRule {
@@ -255,7 +328,7 @@ impl CompiledRule {
 }
 
 impl Prefilter {
-    fn new(rules: &[CompiledRule]) -> Self {
+    fn new(rules: &[CompiledRule]) -> Result<Self> {
         let mut keyword_map: HashMap<String, Vec<usize>> = HashMap::new();
         let mut always_rules = Vec::new();
         for (idx, rule) in rules.iter().enumerate() {
@@ -278,17 +351,19 @@ impl Prefilter {
         let ac = if keywords.is_empty() {
             None
         } else {
-            AhoCorasickBuilder::new()
-                .ascii_case_insensitive(true)
-                .match_kind(aho_corasick::MatchKind::Standard)
-                .build(&keywords)
-                .ok()
+            Some(
+                AhoCorasickBuilder::new()
+                    .ascii_case_insensitive(true)
+                    .match_kind(aho_corasick::MatchKind::Standard)
+                    .build(&keywords)
+                    .with_context(|| "failed to build keyword prefilter")?,
+            )
         };
-        Self {
+        Ok(Self {
             ac,
             keyword_rules,
             always_rules,
-        }
+        })
     }
 
     fn candidates(&self, text: &str) -> Vec<usize> {
@@ -397,6 +472,14 @@ fn validate_secret(validate: &Option<RuleValidate>, charset: Option<&Regex>, sec
 }
 
 pub fn collect_files(root: &Path, inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    walk_inputs(root, inputs, &|_| false)
+}
+
+fn walk_inputs(
+    root: &Path,
+    inputs: &[PathBuf],
+    skip_dir: &dyn Fn(&Path) -> bool,
+) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     let mut seen = HashSet::new();
     let targets: Vec<PathBuf> = if inputs.is_empty() {
@@ -417,10 +500,14 @@ pub fn collect_files(root: &Path, inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
             }
             continue;
         }
+        if !target.exists() {
+            return Err(anyhow!("path does not exist: {}", target.display()));
+        }
         if target.is_dir() {
             for entry in walkdir::WalkDir::new(&target)
                 .follow_links(false)
                 .into_iter()
+                .filter_entry(|entry| !(entry.file_type().is_dir() && skip_dir(entry.path())))
                 .filter_map(Result::ok)
             {
                 if entry.file_type().is_file() {
@@ -481,7 +568,7 @@ struct GitBlob {
     content: Vec<u8>,
 }
 
-fn collect_staged_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
+fn list_staged_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
     let output = run_git(
         repo_root,
         &[
@@ -534,10 +621,10 @@ fn collect_staged_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
         });
     }
 
-    load_git_blob_contents(repo_root, blobs)
+    Ok(blobs)
 }
 
-fn collect_tracked_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
+fn list_tracked_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
     let output = run_git(
         repo_root,
         &["ls-files", "--stage", "-z"],
@@ -571,7 +658,7 @@ fn collect_tracked_blobs(repo_root: &Path) -> Result<Vec<GitBlob>> {
         });
     }
 
-    load_git_blob_contents(repo_root, blobs)
+    Ok(blobs)
 }
 
 fn run_git(repo_root: &Path, args: &[&str], operation: &str) -> Result<Output> {
@@ -587,58 +674,103 @@ fn run_git(repo_root: &Path, args: &[&str], operation: &str) -> Result<Output> {
     Ok(output)
 }
 
-fn load_git_blob_contents(repo_root: &Path, mut blobs: Vec<GitBlob>) -> Result<Vec<GitBlob>> {
-    if blobs.is_empty() {
-        return Ok(blobs);
-    }
+type CatFile = (
+    Child,
+    BufReader<ChildStdout>,
+    JoinHandle<std::io::Result<()>>,
+);
 
+/// Starts `git cat-file <mode>` and feeds it the object ids from a separate thread.
+fn spawn_cat_file(repo_root: &Path, mode: &str, object_ids: Vec<String>) -> Result<CatFile> {
     let mut child = Command::new("git")
         .arg("-C")
         .arg(repo_root)
-        .args(["cat-file", "--batch"])
+        .args(["cat-file", mode])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .with_context(|| "failed to read staged git objects")?;
-
     let mut stdin = child
         .stdin
         .take()
         .ok_or_else(|| anyhow!("failed to open git cat-file stdin"))?;
-    let object_ids: Vec<String> = blobs.iter().map(|blob| blob.object_id.clone()).collect();
     let writer = std::thread::spawn(move || -> std::io::Result<()> {
         for object_id in object_ids {
             writeln!(stdin, "{object_id}")?;
         }
         Ok(())
     });
-
     let stdout = child
         .stdout
         .take()
         .ok_or_else(|| anyhow!("failed to open git cat-file stdout"))?;
-    let mut reader = BufReader::new(stdout);
-    for blob in &mut blobs {
-        let mut header = String::new();
-        reader.read_line(&mut header)?;
-        let mut parts = header.split_ascii_whitespace();
-        let returned_id = parts
-            .next()
-            .ok_or_else(|| anyhow!("missing object id for staged object {}", blob.object_id))?;
-        let object_type = parts
-            .next()
-            .ok_or_else(|| anyhow!("missing type for staged object {}", blob.object_id))?;
-        let size = parts
-            .next()
-            .ok_or_else(|| anyhow!("missing size for staged object {}", blob.object_id))?
-            .parse::<usize>()
-            .with_context(|| format!("invalid size for staged object {}", blob.object_id))?;
-        if returned_id != blob.object_id || object_type != "blob" {
-            return Err(anyhow!(
-                "unexpected staged object response: {}",
-                header.trim()
-            ));
+    Ok((child, BufReader::new(stdout), writer))
+}
+
+fn finish_cat_file(mut child: Child, writer: JoinHandle<std::io::Result<()>>) -> Result<()> {
+    let status = child.wait()?;
+    writer
+        .join()
+        .map_err(|_| anyhow!("git cat-file input thread panicked"))??;
+    if !status.success() {
+        return Err(anyhow!("git cat-file failed with status {status}"));
+    }
+    Ok(())
+}
+
+/// Reads one `<id> blob <size>` header line and returns the size.
+fn read_blob_header(reader: &mut impl BufRead, blob: &GitBlob) -> Result<usize> {
+    let mut header = String::new();
+    reader.read_line(&mut header)?;
+    let mut parts = header.split_ascii_whitespace();
+    let returned_id = parts
+        .next()
+        .ok_or_else(|| anyhow!("missing object id for staged object {}", blob.object_id))?;
+    let object_type = parts
+        .next()
+        .ok_or_else(|| anyhow!("missing type for staged object {}", blob.object_id))?;
+    let size = parts
+        .next()
+        .ok_or_else(|| anyhow!("missing size for staged object {}", blob.object_id))?
+        .parse::<usize>()
+        .with_context(|| format!("invalid size for staged object {}", blob.object_id))?;
+    if returned_id != blob.object_id || object_type != "blob" {
+        return Err(anyhow!(
+            "unexpected staged object response: {}",
+            header.trim()
+        ));
+    }
+    Ok(size)
+}
+
+/// Loads the blob contents. Blobs larger than `max_size` are dropped from the result
+/// without their content being read.
+fn load_git_blob_contents(
+    repo_root: &Path,
+    mut blobs: Vec<GitBlob>,
+    max_size: Option<u64>,
+) -> Result<Vec<GitBlob>> {
+    let object_ids = |blobs: &[GitBlob]| blobs.iter().map(|blob| blob.object_id.clone()).collect();
+
+    if let (Some(max), false) = (max_size, blobs.is_empty()) {
+        let (child, mut reader, writer) =
+            spawn_cat_file(repo_root, "--batch-check", object_ids(&blobs))?;
+        let mut within_limit = Vec::with_capacity(blobs.len());
+        for blob in blobs {
+            if read_blob_header(&mut reader, &blob)? as u64 <= max {
+                within_limit.push(blob);
+            }
         }
+        finish_cat_file(child, writer)?;
+        blobs = within_limit;
+    }
+    if blobs.is_empty() {
+        return Ok(blobs);
+    }
+
+    let (child, mut reader, writer) = spawn_cat_file(repo_root, "--batch", object_ids(&blobs))?;
+    for blob in &mut blobs {
+        let size = read_blob_header(&mut reader, blob)?;
         blob.content.resize(size, 0);
         reader.read_exact(&mut blob.content)?;
         let mut newline = [0_u8; 1];
@@ -647,14 +779,7 @@ fn load_git_blob_contents(repo_root: &Path, mut blobs: Vec<GitBlob>) -> Result<V
             return Err(anyhow!("invalid staged object delimiter"));
         }
     }
-
-    let status = child.wait()?;
-    writer
-        .join()
-        .map_err(|_| anyhow!("git cat-file input thread panicked"))??;
-    if !status.success() {
-        return Err(anyhow!("git cat-file failed with status {status}"));
-    }
+    finish_cat_file(child, writer)?;
     Ok(blobs)
 }
 
@@ -717,6 +842,7 @@ mod tests {
             pattern: pattern.to_string(),
             keywords: vec!["secret_".to_string()],
             capture: 1,
+            generic: false,
             validate: None,
             paths: None,
             allow: None,
@@ -841,6 +967,107 @@ mod tests {
             Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector");
 
         assert!(detector.scan_files(dir.path(), &[missing]).is_err());
+    }
+
+    #[test]
+    fn path_scan_rejects_missing_inputs() {
+        let dir = tempdir().expect("tempdir");
+        assert!(collect_files(dir.path(), &[PathBuf::from("nope.txt")]).is_err());
+    }
+
+    #[test]
+    fn path_scan_does_not_descend_into_ignored_directories() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        fs::create_dir_all(root.join("node_modules/pkg")).expect("create dir");
+        fs::create_dir_all(root.join("src")).expect("create dir");
+        fs::write(root.join("node_modules/pkg/index.js"), "secret_ABC123").expect("write");
+        fs::write(root.join("src/app.js"), "clean").expect("write");
+
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let detector =
+            Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector");
+        let files = detector.collect_files(root, &[]).expect("collect");
+
+        assert_eq!(files, vec![root.join("src/app.js")]);
+        assert_eq!(collect_files(root, &[]).expect("collect").len(), 2);
+    }
+
+    fn detector_with_size_limit(max_file_size: u64) -> Detector {
+        let mut config = Config::default();
+        config.scan.max_file_size = max_file_size;
+        let filter = Filter::from_config(Some(config), Vec::new()).expect("filter");
+        Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector")
+    }
+
+    #[test]
+    fn files_above_the_size_limit_are_skipped_and_counted() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        let big = root.join("big.txt");
+        fs::write(&big, format!("secret_ABC123 {}\n", "x".repeat(200))).expect("write");
+        fs::write(root.join("small.txt"), "secret_DEF456\n").expect("write");
+        git(root, &["add", "."]);
+
+        let limited = detector_with_size_limit(100);
+        let staged = limited.scan_staged_files(root).expect("scan staged");
+        assert_eq!(staged.len(), 1);
+        assert_eq!(staged[0].path, "small.txt");
+        assert_eq!(limited.skipped_large_files(), 1);
+        assert!(limited.scan_files(root, &[big]).expect("scan").is_empty());
+        assert_eq!(limited.skipped_large_files(), 2);
+
+        let unlimited = detector_with_size_limit(0);
+        assert_eq!(unlimited.scan_staged_files(root).expect("scan").len(), 2);
+        assert_eq!(unlimited.skipped_large_files(), 0);
+    }
+
+    #[test]
+    fn overlapping_rules_report_the_most_specific_one() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        let path = root.join("config.txt");
+        fs::write(&path, "key = secret_ABC123\nother = secret_XYZ789\n").expect("write");
+
+        let mut generic = base_rule(r"key = (secret_[A-Z0-9]{6})");
+        generic.id = "a-generic".to_string();
+        generic.generic = true;
+        let mut specific = base_rule(r"(secret_[A-Z0-9]{6})");
+        specific.id = "z-specific".to_string();
+        let mut weaker = base_rule(r"(secret_[A-Z0-9]{6})");
+        weaker.id = "weaker".to_string();
+        weaker.severity = Severity::Low;
+
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let detector = Detector::new(vec![generic, specific, weaker], filter).expect("detector");
+        for _ in 0..20 {
+            let findings = detector
+                .scan_files(root, std::slice::from_ref(&path))
+                .expect("scan");
+            let found: Vec<(&str, usize)> = findings
+                .iter()
+                .map(|finding| (finding.rule_id.as_str(), finding.line))
+                .collect();
+            assert_eq!(found, vec![("z-specific", 1), ("z-specific", 2)]);
+        }
+    }
+
+    #[test]
+    fn inline_marker_inside_other_text_does_not_ignore() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        let path = root.join("config.txt");
+        fs::write(
+            &path,
+            "contact = \"bob@nsight.io\"; key = \"secret_ABC123\"\n",
+        )
+        .expect("write");
+
+        let filter = Filter::from_config(None, Vec::new()).expect("filter");
+        let detector =
+            Detector::new(vec![base_rule(r"(secret_[A-Z0-9]{6})")], filter).expect("detector");
+        assert_eq!(detector.scan_files(root, &[path]).expect("scan").len(), 1);
     }
 
     #[test]

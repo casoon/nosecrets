@@ -389,6 +389,8 @@ dependencies = [
  "nosecrets-filter",
  "nosecrets-report",
  "nosecrets-rules",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

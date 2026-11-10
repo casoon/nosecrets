@@ -14,6 +14,9 @@ Regeln werden in TOML definiert.
 | pattern | string | ja | Regex mit Capture Group |
 | keywords | [string] | nein | Prefilter-Keywords |
 | capture | int | nein | Capture Group Index (default: 1) |
+| generic | bool | nein | Auffangregel: trifft eine spezifische Regel gleicher Severity denselben Text, wird nur diese gemeldet (default: false) |
+
+Unbekannte Felder sind ein Fehler, ebenso leere `id`/`pattern` und `min_length` > `max_length`.
 
 ### validate Block
 

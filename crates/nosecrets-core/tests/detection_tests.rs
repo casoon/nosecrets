@@ -539,3 +539,16 @@ fn entropy_respects_min_length() {
         "should respect min_length setting"
     );
 }
+
+// ============================================================================
+// Overlapping rules
+// ============================================================================
+
+#[test]
+fn specific_rule_wins_over_generic_rule_for_the_same_secret() {
+    let detector = create_detector();
+    // Assembled at runtime so the source file holds no token-shaped literal.
+    let key = ["sk_", "live_", "4eC39HqLyjWDarjtT1zdp7dc"].concat();
+    let findings = scan_content(&detector, &format!("STRIPE_API_KEY = \"{key}\"\n"));
+    assert_eq!(findings, vec!["stripe-secret-key"]);
+}

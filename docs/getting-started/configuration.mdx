@@ -26,11 +26,19 @@ require_context = true
 
 [entropy.allow]
 patterns = ["^[a-f0-9]{32,}$"]
+
+[scan]
+max_file_size = 5242880
 ```
 
 Global allow patterns and values apply to all findings. Entropy-specific patterns apply only to
 the high-entropy detector. With `require_context = true`, entropy candidates must appear near terms
 such as `secret`, `token`, `key`, `auth` or `password`.
+
+Files larger than `scan.max_file_size` bytes (default 5 MiB) are skipped; nosecrets states on stderr
+how many. Set it to `0` to scan files of any size.
+
+An unknown key anywhere in `.nosecrets.toml` stops the scan with an error that names the key.
 
 ## Fingerprint ignores
 
@@ -55,7 +63,11 @@ Use an inline marker only when the reason is obvious beside the value:
 ```text
 api_key = "documented-example" # @nosecrets-ignore
 api_key = "documented-example" # @nsi test fixture
+api_key = "documented-example" # gitleaks:allow
 ```
+
+A marker must stand as a separate word, after whitespace or a comment opener. The same characters
+inside an e-mail address or a longer word are not a marker.
 
 <Callout type="caution">
   An allowlist suppresses a finding; it does not make the value safe. Prefer narrow path-scoped

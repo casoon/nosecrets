@@ -3,7 +3,7 @@
   "type": "flow",
   "title": "Detection pipeline for one file",
   "description": "Each file first passes the path filter and is skipped if it is binary. Known formats: a keyword prefilter picks candidate rules, their regular expressions find matches, structural validation checks charset, length and prefix, then rule and repository allowlists, inline markers and fingerprint ignores are applied. Unknown tokens: the entropy detector looks for high-entropy strings, skips those already found by a rule, then applies inline markers, allowed values and fingerprint ignores. What remains is reported as a finding.",
-  "source": "crates/nosecrets-core/src/lib.rs (scan_content), crates/nosecrets-core/src/entropy.rs, crates/nosecrets-filter/src/",
+  "source": "crates/nosecrets-core/src/detector.rs (scan_content), crates/nosecrets-core/src/entropy.rs, crates/nosecrets-core/src/filter.rs",
   "width": 820,
   "height": 900,
   "flow": {

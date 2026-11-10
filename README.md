@@ -159,7 +159,7 @@ A marker counts only as a separate word in a comment; `@nsi` inside an e-mail ad
 
 ## Default rules
 
-Rules are shipped in TOML files under `crates/nosecrets-rules/rules/`:
+Rules are shipped in TOML files under `crates/nosecrets-core/rules/`:
 
 - `rules/cloud.toml` (AWS/GCP/Azure/Cloudflare, etc.)
 - `rules/deploy.toml` (Netlify, Fly.io, Heroku, Vercel, Railway, Render, Supabase)
@@ -198,6 +198,9 @@ repos:
       - id: nosecrets-system
 ```
 
+Use `id: nosecrets` instead to have the hook build the binary from source; that needs a Rust
+toolchain but no installed `nosecrets`.
+
 With [lefthook](https://lefthook.dev/) (`lefthook.yml`):
 
 ```yaml
@@ -231,12 +234,9 @@ git tag v0.3.8
 git push origin v0.3.8
 ```
 
-Publish the workspace crates locally in dependency order before creating the tag. The tag workflow then waits for CI, builds release binaries, publishes the GitHub release, and publishes the npm package with provenance.
+Publish the two crates locally, library first, before creating the tag. The tag workflow then waits for CI, builds release binaries, publishes the GitHub release, and publishes the npm package with provenance.
 
 ```bash
-cargo publish -p nosecrets-rules
-cargo publish -p nosecrets-filter
-cargo publish -p nosecrets-report
 cargo publish -p nosecrets-core
 cargo publish -p nosecrets-cli
 ```

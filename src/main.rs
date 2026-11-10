@@ -5,10 +5,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
-use nosecrets_core::{discover_repo_root, Detector};
-use nosecrets_filter::{load_ignore_file, normalize_path, Config, Filter};
-use nosecrets_report::Report;
-use nosecrets_rules::{load_builtin_rules, parse_rules};
+use nosecrets_core::{
+    discover_repo_root, load_builtin_rules, load_ignore_file, normalize_path, parse_rules, Config,
+    Detector, Filter, Finding, Report,
+};
 
 #[derive(Parser, Debug)]
 #[command(name = "nosecrets", version, about = "Fast offline secret scanner")]
@@ -157,10 +157,7 @@ fn run_ignore(args: IgnoreArgs) -> Result<()> {
     Ok(())
 }
 
-fn interactive_filter(
-    root: &Path,
-    findings: Vec<nosecrets_report::Finding>,
-) -> Result<Vec<nosecrets_report::Finding>> {
+fn interactive_filter(root: &Path, findings: Vec<Finding>) -> Result<Vec<Finding>> {
     if findings.is_empty() {
         return Ok(findings);
     }

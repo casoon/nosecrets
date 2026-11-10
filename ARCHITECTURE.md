@@ -2,34 +2,25 @@
 
 ## Crates
 
-### nosecrets-cli
+### nosecrets-cli (Repository-Wurzel, `src/main.rs`)
 - Entry Point
 - Argument Parsing (clap)
 - Exit Codes
 - Interaktiver Modus
 
-### nosecrets-core
-- Detector Struct
-- Aho-Corasick Prefiltering
-- Regex Matching
-- Strukturvalidierung (charset, length, prefix)
+### nosecrets-core (`crates/nosecrets-core`)
 
-### nosecrets-rules
-- TOML Parser
-- Rule Struct
-- Eingebettete Default-Regeln (compile-time)
+Die Bibliothek; ein Fehlertyp (`Error`), alle oeffentlichen Typen direkt unter `nosecrets_core`.
 
-### nosecrets-filter
-- Pfad-Ignores
-- Pattern-Allows
-- .nosecretsignore Parser
-- Inline-Kommentar Detection (@nosecrets-ignore, @nsi)
-
-### nosecrets-report
-- Finding Struct
-- Fingerprint-Generierung (Content-Hash)
-- Terminal Output (farbig)
-- JSON Export
+- `detector`: Detector Struct, Aho-Corasick Prefiltering, Regex Matching,
+  Strukturvalidierung (charset, length, prefix)
+- `rules`: TOML Parser, Rule Struct, eingebettete Default-Regeln (compile-time, `rules/*.toml`)
+- `filter`: Pfad-Ignores, Pattern-Allows, .nosecretsignore Parser,
+  Inline-Kommentar Detection (@nosecrets-ignore, @nsi)
+- `report`: Finding Struct, Fingerprint-Generierung (Content-Hash), Terminal Output (farbig),
+  JSON Export
+- `entropy`: Shannon-Entropie fuer unbekannte Secrets
+- `git`: Index-Blobs lesen (`git diff --cached`, `git ls-files`, `git cat-file --batch`)
 
 ## Detection Pipeline
 

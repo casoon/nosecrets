@@ -15,7 +15,7 @@ Fast, offline secret scanner for Git pre-commit. It checks what a commit is abou
 
 - Checks exactly what the next commit contains (the Git index), not the working tree
 - Offline only: no API calls, no verification against providers, no history scanning
-- 50 built-in rules plus your own; an entropy check for tokens no rule knows
+- 75 built-in rules plus your own; an entropy check for tokens no rule knows
 - Exceptions live in files in the repository, so they show up in code review
 - Exit status 0, 1 or 2 and JSON output for scripts and CI
 - Prefilter, regex and a format check (prefix, charset, length) keep it fast and quiet
@@ -227,12 +227,13 @@ A marker counts only as a separate word in a comment; `@nsi` inside an e-mail ad
 
 Rules are shipped in TOML files under `crates/nosecrets-core/rules/`:
 
-- `rules/cloud.toml` (AWS/GCP/Azure/Cloudflare, etc.)
-- `rules/deploy.toml` (Netlify, Fly.io, Heroku, Vercel, Railway, Render, Supabase)
-- `rules/code.toml` (GitHub/GitLab/npm/Slack/Discord, etc.)
-- `rules/communication.toml` (SendGrid, Twilio, Mailchimp, Mailgun)
+- `rules/ai.toml` (Anthropic, OpenAI, Hugging Face, Groq, xAI, OpenRouter, Replicate, Perplexity)
+- `rules/cloud.toml` (AWS/GCP/Azure/Cloudflare, Databricks, etc.)
+- `rules/deploy.toml` (Netlify, Fly.io, Heroku, Vercel, Railway, Render, Supabase, Doppler)
+- `rules/code.toml` (GitHub/GitLab/npm/Slack/Discord, Docker Hub, Sentry, Linear, Notion, Postman, 1Password, etc.)
+- `rules/communication.toml` (SendGrid, Twilio, Mailchimp, Mailgun, Telegram)
 - `rules/database.toml` (Postgres/MySQL/Mongo/Redis, JDBC passwords)
-- `rules/payment.toml` (Stripe)
+- `rules/payment.toml` (Stripe, Square, PayPal, Shopify)
 - `rules/generic.toml` (private keys, generic secrets, passwords)
 - High-entropy detection (unknown tokens, proprietary secrets)
 

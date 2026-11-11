@@ -1,5 +1,6 @@
 //! Scanning engine of the `nosecrets` secret scanner: rules, filters, detection and reporting.
 
+mod checksum;
 mod detector;
 pub mod entropy;
 mod error;

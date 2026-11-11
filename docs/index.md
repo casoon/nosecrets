@@ -5,7 +5,7 @@ order: 0
 ---
 
 nosecrets is an offline CLI for detecting credentials before they enter Git history. It combines
-50 built-in rules with high-entropy detection, then applies path filters, allowlists and explicit
+75 built-in rules with high-entropy detection, then applies path filters, allowlists and explicit
 ignores before reporting a finding.
 
 ## The two Git index scans

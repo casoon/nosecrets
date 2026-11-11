@@ -25,8 +25,9 @@ Every file passes the same pipeline (`scan_content` in `crates/nosecrets-core/sr
 
 <Diagram name="detection" />
 
-- **Known formats.** 50 built-in rules in `crates/nosecrets-core/rules/` cover cloud providers,
-  deploy platforms, code hosts, messaging, databases, payment and generic patterns. An
+- **Known formats.** 75 built-in rules in `crates/nosecrets-core/rules/` cover cloud providers,
+  deploy platforms, code hosts, AI providers, developer tools, messaging, databases, payment and
+  generic patterns. An
   Aho-Corasick keyword prefilter selects the rules worth running, the rule's regular expression
   finds candidates, and structural validation (charset, length, prefix) drops values that cannot be
   the real format.

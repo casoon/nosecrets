@@ -66,6 +66,21 @@ charset = "A-Za-z0-9_-"
 [rule.allow]
 patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
 
+# Token formats since February 2026: vcp (personal), vci (integration), vca (app access),
+# vcr (app refresh), vck (API key). Vercel documents the prefixes only, so the body is
+# matched loosely.
+[[rule]]
+id = "vercel-prefixed-token"
+name = "Vercel Prefixed Token"
+severity = "high"
+pattern = '''\b(vc[piark]_[A-Za-z0-9_-]{20,})'''
+keywords = ["vcp_", "vci_", "vca_", "vcr_", "vck_"]
+capture = 1
+
+[rule.validate]
+prefix = ["vcp_", "vci_", "vca_", "vcr_", "vck_"]
+min_length = 24
+
 [[rule]]
 id = "railway-token"
 name = "Railway Token"
@@ -96,6 +111,32 @@ charset = "A-Za-z0-9_-"
 [rule.allow]
 patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
 
+# Opaque keys replacing the legacy JWTs. sb_publishable_ keys are public by design and have
+# no rule. Length and alphabet are not documented, so the body is matched loosely.
+[[rule]]
+id = "supabase-secret-key"
+name = "Supabase Secret Key"
+severity = "critical"
+pattern = '''\b(sb_secret_[A-Za-z0-9_-]{16,})'''
+keywords = ["sb_secret_"]
+capture = 1
+
+[rule.validate]
+prefix = ["sb_secret_"]
+min_length = 26
+
+[[rule]]
+id = "supabase-personal-access-token"
+name = "Supabase Personal Access Token"
+severity = "critical"
+pattern = '''\b(sbp_[a-z0-9]{40})\b'''
+keywords = ["sbp_"]
+capture = 1
+
+[rule.validate]
+prefix = ["sbp_"]
+length = 44
+
 [[rule]]
 id = "supabase-anon-key"
 name = "Supabase Anon Key"
@@ -117,3 +158,15 @@ capture = 1
 
 [rule.validate]
 min_length = 60
+
+[[rule]]
+id = "doppler-token"
+name = "Doppler Personal Token"
+severity = "critical"
+pattern = '''\b(dp\.pt\.[A-Za-z0-9]{43})\b'''
+keywords = ["dp.pt."]
+capture = 1
+
+[rule.validate]
+prefix = ["dp.pt."]
+length = 49

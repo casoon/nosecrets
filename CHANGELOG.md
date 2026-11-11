@@ -5,6 +5,11 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Pages:** the project site uses the current shared theme (0.12.10).
+
+
 ## [0.4.0] - 2026-11-11
 
 ### Breaking

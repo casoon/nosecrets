@@ -1,0 +1,4 @@
+git add config.py
+sed -i.bak '/GITHUB_TOKEN/d' config.py && rm config.py.bak
+cat config.py
+nosecrets scan --staged

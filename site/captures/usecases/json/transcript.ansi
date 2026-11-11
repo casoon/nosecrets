@@ -1,0 +1,14 @@
+[2m$[0m git add deploy.py
+[2m$[0m nosecrets scan --staged --format json
+[
+  {
+    "path": "deploy.py",
+    "line": 3,
+    "column": 17,
+    "rule_id": "github-pat",
+    "rule_name": "GitHub Personal Access Token",
+    "severity": "critical",
+    "fingerprint": "nsi_5e31772c2cb9",
+    "preview": "ghp_...PeXq"
+  }
+]

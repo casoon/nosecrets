@@ -1,0 +1,3 @@
+SERVICE_NAME = "billing"
+API_KEY = "changeme"
+INTERNAL_SERVICE_TOKEN = "q7Zk2vN9xB4mT8wR1cL6hD3fY5jP0sGe"

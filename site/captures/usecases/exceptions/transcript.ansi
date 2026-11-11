@@ -1,0 +1,4 @@
+[2m$[0m git add -A
+[2m$[0m nosecrets scan --staged
+app.py:2:12 [[1m[31mCRITICAL[0m] GitHub Personal Access Token (github-pat) [2mnsi_8c2b7cfaeaba[0m
+  preview: [2mghp_...NeUo[0m

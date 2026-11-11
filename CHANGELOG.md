@@ -5,10 +5,14 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Site:** the [Showcase](https://casoon.github.io/nosecrets/showcase/) shows eight use cases as real nosecrets runs next to the files they scan, and the start page links the most common ones.
+- **README:** a recorded terminal scene and the same real examples.
+
 ### Changed
 
-- **Pages:** the project site uses the current shared theme (0.12.10).
-
+- **Pages:** the project site uses the shared theme 0.12.10.
 
 ## [0.4.0] - 2026-11-11
 

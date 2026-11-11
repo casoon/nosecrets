@@ -1,0 +1,4 @@
+[2m$[0m git add settings.py
+[2m$[0m nosecrets scan --staged
+settings.py:3:27 [[33mMEDIUM[0m] High Entropy String (high-entropy-string) [2mnsi_294e8f1228c4[0m
+  preview: [2mq7Zk...0sGe[0m

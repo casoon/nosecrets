@@ -23,7 +23,9 @@ export default defineConfig({
         concepts: 'Concepts',
         reference: 'Reference',
       },
-      showcase: false,
+      showcase: './src/showcase.ts',
+      showcaseLead:
+        'Each example is a real nosecrets run: the files on the left, the session on the right. Open one to see how nosecrets behaves in the situation you are in.',
     }),
   ],
 });

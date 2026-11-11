@@ -1,0 +1,2 @@
+API_URL = "https://api.acme.example"
+GITHUB_TOKEN = "ghp_R2kT9xLm4Qv7Bn3Zc8Wd5Hf1Jg6Ys0AaPeXq"

@@ -3,17 +3,83 @@
 [![Crates.io](https://img.shields.io/crates/v/nosecrets-cli.svg)](https://crates.io/crates/nosecrets-cli)
 [![CI](https://github.com/casoon/nosecrets/actions/workflows/ci.yml/badge.svg)](https://github.com/casoon/nosecrets/actions/workflows/ci.yml)
 
-Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, and safe for any GitHub repository.
+Fast, offline secret scanner for Git pre-commit. It checks what a commit is about to contain and stops the commit when it finds a password, token or key, on your own machine, without an account or a network call.
 
-**Documentation:** [casoon.github.io/nosecrets](https://casoon.github.io/nosecrets/)
+<p align="center">
+  <img src="site/captures/scan.svg" width="561" alt="Terminal: after git add config.py, nosecrets scan --staged reports an AWS secret access key in config.py and exits with 1; with the key read from the environment the same scan prints 'No secrets found' and exits with 0.">
+</p>
+
+**Documentation:** [casoon.github.io/nosecrets](https://casoon.github.io/nosecrets/) · **Examples:** [Showcase](https://casoon.github.io/nosecrets/showcase/)
 
 ## Highlights
 
-- Pre-commit focus (no history scanning)
-- Offline only, no API calls
-- Fast scanning: a keyword prefilter picks the rules worth running, a regex finds candidates, and a format check (prefix, charset, length) drops values that cannot be real
-- High-entropy detection for unknown secrets
-- Minimal configuration
+- Checks exactly what the next commit contains (the Git index), not the working tree
+- Offline only: no API calls, no verification against providers, no history scanning
+- 50 built-in rules plus your own; an entropy check for tokens no rule knows
+- Exceptions live in files in the repository, so they show up in code review
+- Exit status 0, 1 or 2 and JSON output for scripts and CI
+- Prefilter, regex and a format check (prefix, charset, length) keep it fast and quiet
+
+## In practice
+
+Every example below is a real run of the released binary against made-up tokens; the [Showcase](https://casoon.github.io/nosecrets/showcase/) has the files next to each session.
+
+### Stop a leak before it is committed
+
+```text
+$ git add deploy.py .env
+$ nosecrets scan --staged
+.env:2:31 [HIGH] Postgres Connection URI (postgres-connection-uri) nsi_31013ade6422
+  preview: Tr0...
+deploy.py:3:17 [CRITICAL] GitHub Personal Access Token (github-pat) nsi_5e31772c2cb9
+  preview: ghp_...PeXq
+$ echo $?
+1
+```
+
+The commit stops (exit status 1). The report names file, line, rule and a masked preview, never the secret itself. Deleting the line afterwards does not help: the [staged blob is what counts](https://casoon.github.io/nosecrets/showcase/staged-snapshot/).
+
+### Adopt it in a repository that already exists
+
+```text
+$ nosecrets scan --tracked
+legacy/import_users.py:2:17 [CRITICAL] GitHub Personal Access Token (github-pat) nsi_5e31772c2cb9
+  preview: ghp_...PeXq
+$ nosecrets ignore nsi_5e31772c2cb9 --path legacy/import_users.py
+Added ignore entry to .nosecretsignore
+$ cat .nosecretsignore
+nsi_5e31772c2cb9:legacy/import_users.py
+$ nosecrets scan --tracked
+No secrets found
+```
+
+`scan --tracked` checks every tracked file once. A known old value is accepted by fingerprint and path; the entry is a line in `.nosecretsignore`.
+
+### Your own token formats
+
+```toml
+[[rule]]
+id = "acme-service-token"
+name = "Acme service token"
+severity = "high"
+pattern = '''\b(acme_[A-Za-z0-9]{24})\b'''
+keywords = ["acme_"]
+capture = 1
+```
+
+```text
+$ git add deploy.sh
+$ nosecrets scan --staged --rules team-rules.toml
+deploy.sh:2:24 [HIGH] Acme service token (acme-service-token) nsi_a7570523585c
+  preview: acme...
+```
+
+### More
+
+- [Exceptions on purpose](https://casoon.github.io/nosecrets/showcase/exceptions/): inline `@nsi` marker, ignored paths, allowed values.
+- [A token no rule knows](https://casoon.github.io/nosecrets/showcase/entropy/): the entropy check.
+- [Machine-readable output](https://casoon.github.io/nosecrets/showcase/json/): `--format json`.
+- [A typo in the configuration](https://casoon.github.io/nosecrets/showcase/bad-config/): an error with exit status 2, never a silent pass.
 
 ## Install
 

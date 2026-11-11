@@ -39,18 +39,21 @@ prefix = ["gho_"]
 charset = "A-Za-z0-9_"
 length = 40
 
+# ghu_ user tokens are 40 characters. ghs_ installation tokens were 40 characters and became
+# JWT-style (about 520 characters, with `_` and `.`) in October 2026; GitHub documents no
+# alphabet or length for the new form, so ghs_ is matched loosely.
 [[rule]]
 id = "github-app"
 name = "GitHub App Token"
 severity = "high"
-pattern = '''\b(ghu_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36})\b'''
+pattern = '''\b(ghu_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9._-]{36,})'''
 keywords = ["ghu_", "ghs_"]
 capture = 1
 
 [rule.validate]
 prefix = ["ghu_", "ghs_"]
-charset = "A-Za-z0-9_"
-length = 40
+charset = "A-Za-z0-9_.-"
+min_length = 40
 
 [[rule]]
 id = "gitlab-pat"
@@ -64,6 +67,20 @@ capture = 1
 prefix = ["glpat-"]
 charset = "A-Za-z0-9_-"
 length = 26
+
+# Routable tokens: glpat-<27 to 300 characters>.<9 characters>. The format is documented by
+# GitLab only as a prefix; the structure follows the published scanner configurations.
+[[rule]]
+id = "gitlab-pat-routable"
+name = "GitLab Personal Access Token (routable)"
+severity = "critical"
+pattern = '''\b(glpat-[A-Za-z0-9_-]{27,300}\.[a-z0-9]{9})\b'''
+keywords = ["glpat-"]
+capture = 1
+
+[rule.validate]
+prefix = ["glpat-"]
+min_length = 43
 
 [[rule]]
 id = "npm-token"
@@ -102,6 +119,19 @@ capture = 1
 [rule.validate]
 prefix = ["xoxp-", "xoxb-", "xoxo-", "xoxa-", "xoxr-", "xoxs-"]
 
+# App-level and configuration tokens; the vendor documents the prefixes only.
+[[rule]]
+id = "slack-app-config-token"
+name = "Slack App or Configuration Token"
+severity = "critical"
+pattern = '''\b(xapp-[0-9]-[A-Za-z0-9]+-[0-9]+-[A-Za-z0-9]+|xoxe\.xox[bp]-[0-9]-[A-Za-z0-9]{163,166}|xoxe-[0-9]-[A-Za-z0-9]{146})\b'''
+keywords = ["xapp-", "xoxe"]
+capture = 1
+
+[rule.validate]
+prefix = ["xapp-", "xoxe.xoxb-", "xoxe.xoxp-", "xoxe-"]
+min_length = 30
+
 [[rule]]
 id = "slack-webhook"
 name = "Slack Webhook URL"
@@ -125,3 +155,90 @@ severity = "high"
 pattern = '''(https://discord(?:app)?\.com/api/webhooks/[0-9]{17,20}/[A-Za-z0-9_-]{60,68})'''
 keywords = ["discord.com/api/webhooks", "discordapp.com/api/webhooks"]
 capture = 1
+
+# Developer-tool tokens with distinctive prefixes. The vendors document the prefixes only; the
+# patterns follow the published scanner configurations.
+
+[[rule]]
+id = "onepassword-service-account-token"
+name = "1Password Service Account Token"
+severity = "critical"
+pattern = '''\b(ops_eyJ[A-Za-z0-9+/]{250,}={0,3})'''
+keywords = ["ops_eyj"]
+capture = 1
+
+[rule.validate]
+prefix = ["ops_eyJ"]
+min_length = 260
+
+[[rule]]
+id = "dockerhub-token"
+name = "Docker Hub Access Token"
+severity = "critical"
+pattern = '''\b(dckr_pat_[A-Za-z0-9_-]{27}|dckr_oat_[A-Za-z0-9_-]{32})(?:[^A-Za-z0-9_-]|$)'''
+keywords = ["dckr_pat_", "dckr_oat_"]
+capture = 1
+
+[rule.validate]
+prefix = ["dckr_pat_", "dckr_oat_"]
+min_length = 36
+
+[[rule]]
+id = "sentry-user-token"
+name = "Sentry User Auth Token"
+severity = "high"
+pattern = '''\b(sntryu_[a-f0-9]{64})\b'''
+keywords = ["sntryu_"]
+capture = 1
+
+[rule.validate]
+prefix = ["sntryu_"]
+length = 71
+
+[[rule]]
+id = "sentry-org-token"
+name = "Sentry Organization Auth Token"
+severity = "high"
+pattern = '''\b(sntrys_eyJpYXQiO[A-Za-z0-9+/=_-]{30,})'''
+keywords = ["sntrys_"]
+capture = 1
+
+[rule.validate]
+prefix = ["sntrys_eyJpYXQiO"]
+min_length = 50
+
+[[rule]]
+id = "linear-api-key"
+name = "Linear API Key"
+severity = "high"
+pattern = '''\b(lin_api_[A-Za-z0-9]{40})\b'''
+keywords = ["lin_api_"]
+capture = 1
+
+[rule.validate]
+prefix = ["lin_api_"]
+length = 48
+
+[[rule]]
+id = "notion-integration-token"
+name = "Notion Integration Token"
+severity = "high"
+pattern = '''\b(ntn_[0-9]{11}[A-Za-z0-9]{35})\b'''
+keywords = ["ntn_"]
+capture = 1
+
+[rule.validate]
+prefix = ["ntn_"]
+length = 50
+
+[[rule]]
+id = "postman-api-key"
+name = "Postman API Key"
+severity = "high"
+pattern = '''\b(PMAK-[a-f0-9]{24}-[a-f0-9]{34})\b'''
+keywords = ["pmak-"]
+capture = 1
+
+[rule.validate]
+prefix = ["PMAK-"]
+length = 64

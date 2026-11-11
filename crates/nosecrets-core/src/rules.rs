@@ -72,6 +72,10 @@ pub struct RuleValidate {
     pub length: Option<usize>,
     pub min_length: Option<usize>,
     pub max_length: Option<usize>,
+    /// Offline checksum of the token; the only supported value is `crc32-base62-suffix6`.
+    /// Needs `prefix`: the checksum covers the part between the prefix and the last six
+    /// characters.
+    pub checksum: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -101,6 +105,10 @@ struct RulesFile {
 
 pub fn load_builtin_rules() -> Result<Vec<Rule>> {
     let mut rules = Vec::new();
+    rules.extend(parse_rules(
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/ai.toml")),
+        "rules/ai.toml",
+    )?);
     rules.extend(parse_rules(
         include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/cloud.toml")),
         "rules/cloud.toml",
@@ -149,6 +157,19 @@ pub fn parse_rules(content: &str, source: &str) -> Result<Vec<Rule>> {
             matches!((validate.min_length, validate.max_length), (Some(min), Some(max)) if min > max)
         }) {
             "min_length is greater than max_length"
+        } else if rule.validate.as_ref().is_some_and(|validate| {
+            validate
+                .checksum
+                .as_deref()
+                .is_some_and(|name| name != crate::checksum::CRC32_BASE62_SUFFIX6)
+        }) {
+            "unknown checksum algorithm"
+        } else if rule
+            .validate
+            .as_ref()
+            .is_some_and(|validate| validate.checksum.is_some() && validate.prefix.is_empty())
+        {
+            "checksum needs validate.prefix"
         } else {
             continue;
         };
@@ -227,5 +248,11 @@ mod tests {
         assert!(parse_rules(&rule("x", "", ""), "inline").is_err());
         let bounds = "[rule.validate]\nmin_length = 9\nmax_length = 3\n";
         assert!(parse_rules(&rule("x", "(a)", bounds), "inline").is_err());
+        let unknown = "[rule.validate]\nprefix = [\"a\"]\nchecksum = \"md5\"\n";
+        assert!(parse_rules(&rule("x", "(a)", unknown), "inline").is_err());
+        let no_prefix = "[rule.validate]\nchecksum = \"crc32-base62-suffix6\"\n";
+        assert!(parse_rules(&rule("x", "(a)", no_prefix), "inline").is_err());
+        let ok = "[rule.validate]\nprefix = [\"a\"]\nchecksum = \"crc32-base62-suffix6\"\n";
+        assert!(parse_rules(&rule("x", "(a)", ok), "inline").is_ok());
     }
 }

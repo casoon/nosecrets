@@ -1,6 +1,6 @@
 ---
 title: Custom rules
-description: Extend the 50 built-in rules with repository-specific TOML definitions.
+description: Extend the 75 built-in rules with repository-specific TOML definitions.
 order: 2
 ---
 
@@ -59,6 +59,7 @@ values = ["int_000000000000000000000000"]
 | `validate.charset` | string | no | Regex character class the whole captured value must match |
 | `validate.length` | integer | no | Exact captured length |
 | `validate.min_length`, `validate.max_length` | integer | no | Captured length range |
+| `validate.checksum` | string | no | `crc32-base62-suffix6`: the last six characters of the value must be the base62-encoded CRC-32 of everything between the prefix and them (the layout of GitHub-style tokens). Needs `validate.prefix`; a value with a wrong checksum is not reported |
 | `paths.include` | list of globs | no | The rule applies only to these paths |
 | `paths.exclude` | list of globs | no | The rule skips these paths |
 | `allow.patterns` | list of regexes | no | Captured values matching one of them are not reported |

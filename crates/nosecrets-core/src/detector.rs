@@ -448,6 +448,14 @@ fn validate_secret(validate: &Option<RuleValidate>, charset: Option<&Regex>, sec
             return false;
         }
     }
+    if validate.checksum.is_some() {
+        // Rule loading guarantees a known algorithm and a prefix list.
+        let body = validate
+            .prefix
+            .iter()
+            .find_map(|prefix| secret.strip_prefix(prefix.as_str()));
+        return body.is_some_and(crate::checksum::is_valid_suffix6);
+    }
     true
 }
 

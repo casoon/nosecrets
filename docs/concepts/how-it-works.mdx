@@ -16,11 +16,11 @@ tracked files, excludes untracked files and does not look at history.
 
 ## Layered detection
 
-Every file passes the same pipeline (`scan_content` in `crates/nosecrets-core/src/lib.rs`):
+Every file passes the same pipeline (`scan_content` in `crates/nosecrets-core/src/detector.rs`):
 
 <Diagram name="detection" />
 
-- **Known formats.** 50 built-in rules in `crates/nosecrets-rules/rules/` cover cloud providers,
+- **Known formats.** 50 built-in rules in `crates/nosecrets-core/rules/` cover cloud providers,
   deploy platforms, code hosts, messaging, databases, payment and generic patterns. An
   Aho-Corasick keyword prefilter selects the rules worth running, the rule's regular expression
   finds candidates, and structural validation (charset, length, prefix) drops values that cannot be

@@ -3,9 +3,9 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::io::{self, Write};
-use thiserror::Error;
 
-use nosecrets_rules::Severity;
+use crate::error::{Error, Result};
+use crate::rules::Severity;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Finding {
@@ -22,14 +22,6 @@ pub struct Finding {
 #[derive(Debug, Default)]
 pub struct Report {
     findings: Vec<Finding>,
-}
-
-#[derive(Debug, Error)]
-pub enum ReportError {
-    #[error("failed to write output: {0}")]
-    Io(#[from] io::Error),
-    #[error("failed to serialize json: {0}")]
-    Json(#[from] serde_json::Error),
 }
 
 impl Report {
@@ -61,8 +53,11 @@ impl Report {
         }
     }
 
-    pub fn print_terminal(&self) -> Result<(), ReportError> {
-        let mut out = io::stdout();
+    pub fn print_terminal(&self) -> Result<()> {
+        self.write_terminal(&mut io::stdout()).map_err(write_error)
+    }
+
+    fn write_terminal(&self, out: &mut impl Write) -> io::Result<()> {
         if self.findings.is_empty() {
             writeln!(out, "{}", style("No secrets found").green())?;
             return Ok(());
@@ -90,12 +85,14 @@ impl Report {
         Ok(())
     }
 
-    pub fn print_json(&self) -> Result<(), ReportError> {
-        let mut out = io::stdout();
-        let json = serde_json::to_string_pretty(&self.findings)?;
-        writeln!(out, "{}", json)?;
-        Ok(())
+    pub fn print_json(&self) -> Result<()> {
+        let json = serde_json::to_string_pretty(&self.findings).map_err(Error::Json)?;
+        writeln!(io::stdout(), "{}", json).map_err(write_error)
     }
+}
+
+fn write_error(source: io::Error) -> Error {
+    Error::io("failed to write output", source)
 }
 
 pub fn fingerprint_secret(secret: &str) -> String {
@@ -144,7 +141,6 @@ fn dedup_findings(findings: Vec<Finding>) -> Vec<Finding> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nosecrets_rules::Severity;
 
     #[test]
     fn fingerprint_is_stable_and_short() {

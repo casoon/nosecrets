@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+
+use crate::error::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -98,23 +99,7 @@ struct RulesFile {
     rule: Vec<Rule>,
 }
 
-#[derive(Debug, Error)]
-pub enum RulesError {
-    #[error("failed to parse rules from {source}: {error}")]
-    Parse {
-        source: String,
-        #[source]
-        error: toml::de::Error,
-    },
-    #[error("invalid rule {id:?} in {file}: {reason}")]
-    Invalid {
-        file: String,
-        id: String,
-        reason: &'static str,
-    },
-}
-
-pub fn load_builtin_rules() -> Result<Vec<Rule>, RulesError> {
+pub fn load_builtin_rules() -> Result<Vec<Rule>> {
     let mut rules = Vec::new();
     rules.extend(parse_rules(
         include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/rules/cloud.toml")),
@@ -150,10 +135,10 @@ pub fn load_builtin_rules() -> Result<Vec<Rule>, RulesError> {
     Ok(rules)
 }
 
-pub fn parse_rules(content: &str, source: &str) -> Result<Vec<Rule>, RulesError> {
-    let parsed: RulesFile = toml::from_str(content).map_err(|error| RulesError::Parse {
-        source: source.to_string(),
-        error,
+pub fn parse_rules(content: &str, source: &str) -> Result<Vec<Rule>> {
+    let parsed: RulesFile = toml::from_str(content).map_err(|error| Error::ParseRules {
+        file: source.to_string(),
+        source: error,
     })?;
     for rule in &parsed.rule {
         let reason = if rule.id.trim().is_empty() {
@@ -167,7 +152,7 @@ pub fn parse_rules(content: &str, source: &str) -> Result<Vec<Rule>, RulesError>
         } else {
             continue;
         };
-        return Err(RulesError::Invalid {
+        return Err(Error::InvalidRule {
             file: source.to_string(),
             id: rule.id.clone(),
             reason,

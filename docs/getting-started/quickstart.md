@@ -28,6 +28,9 @@ repos:
       - id: nosecrets-system
 ```
 
+Use `id: nosecrets` instead to have the hook build the binary from source; that needs a Rust
+toolchain but no installed `nosecrets`.
+
 With [lefthook](https://lefthook.dev/) (`lefthook.yml`):
 
 ```yaml

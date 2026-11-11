@@ -381,66 +381,32 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "nosecrets-cli"
-version = "0.3.9"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
  "nosecrets-core",
- "nosecrets-filter",
- "nosecrets-report",
- "nosecrets-rules",
  "serde_json",
  "tempfile",
 ]
 
 [[package]]
 name = "nosecrets-core"
-version = "0.3.9"
+version = "0.4.0"
 dependencies = [
  "aho-corasick",
- "anyhow",
+ "console",
  "globset",
- "nosecrets-filter",
- "nosecrets-report",
- "nosecrets-rules",
+ "hex",
  "rayon",
  "regex",
- "tempfile",
- "walkdir",
-]
-
-[[package]]
-name = "nosecrets-filter"
-version = "0.3.9"
-dependencies = [
- "globset",
- "regex",
- "serde",
- "tempfile",
- "thiserror",
- "toml",
-]
-
-[[package]]
-name = "nosecrets-report"
-version = "0.3.9"
-dependencies = [
- "console",
- "hex",
- "nosecrets-rules",
  "serde",
  "serde_json",
  "sha2",
- "thiserror",
-]
-
-[[package]]
-name = "nosecrets-rules"
-version = "0.3.9"
-dependencies = [
- "serde",
+ "tempfile",
  "thiserror",
  "toml",
+ "walkdir",
 ]
 
 [[package]]

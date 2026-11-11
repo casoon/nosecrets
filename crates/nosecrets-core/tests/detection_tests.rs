@@ -4,9 +4,7 @@
 //! Note: Some tests (Stripe, Slack, Twilio) are omitted to avoid triggering
 //! GitHub's push protection, even with obviously fake tokens.
 
-use nosecrets_core::Detector;
-use nosecrets_filter::{EntropyConfig, Filter};
-use nosecrets_rules::load_builtin_rules;
+use nosecrets_core::{load_builtin_rules, Detector, EntropyConfig, Filter};
 use std::fs;
 use tempfile::tempdir;
 

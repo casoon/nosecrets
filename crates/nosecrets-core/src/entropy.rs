@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use regex::Regex;
 
-use nosecrets_filter::EntropyConfig;
+use crate::filter::EntropyConfig;
 
 /// A candidate token extracted from file content for entropy analysis.
 #[derive(Debug, Clone)]

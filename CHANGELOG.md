@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file. The format foll
 - **CLI:** a scan that cannot run exits with status 2 instead of 1; status 1 now always means blocking findings. A path that does not exist is such an error instead of a clean result.
 - **Configuration:** unknown keys in `.nosecrets.toml` and in rule files are errors, as are rules with an empty `id` or `pattern` or with `min_length` above `max_length`.
 - **Inline ignores:** `@nsi` and `@nosecrets-ignore` count only as separate words; the same characters inside an e-mail address or another word no longer suppress the findings of that line.
+- **Library:** the crates `nosecrets-rules`, `nosecrets-filter` and `nosecrets-report` are merged into `nosecrets-core`, which exports their types directly and returns one error type, `nosecrets_core::Error`. The three crates are no longer developed; the deprecated `collect_staged_files` is removed.
 
 ### Added
 
@@ -26,6 +27,10 @@ All notable changes to this project are documented in this file. The format foll
 - **Pages:** the project site uses the current shared theme (0.12.6).
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
 - **Build:** building from source requires Rust 1.88 (was 1.85), as `sha2` 0.11 needs it.
+
+### Fixed
+
+- **pre-commit:** the hook `nosecrets`, which builds the binary from source, installs again.
 
 ### Security
 

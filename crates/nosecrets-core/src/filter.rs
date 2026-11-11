@@ -3,9 +3,10 @@ use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::LazyLock;
-use thiserror::Error;
+
+use crate::error::{Error, Result};
 
 /// Inline ignore markers count only as standalone tokens: after the start of the line,
 /// whitespace or a comment opener, and not followed by a word character.
@@ -145,60 +146,26 @@ pub struct Filter {
     max_file_size: u64,
 }
 
-#[derive(Debug, Error)]
-pub enum FilterError {
-    #[error("failed to read {path}: {error}")]
-    Read {
-        path: PathBuf,
-        #[source]
-        error: std::io::Error,
-    },
-    #[error("failed to parse {path}: {error}")]
-    Parse {
-        path: PathBuf,
-        #[source]
-        error: toml::de::Error,
-    },
-    #[error("invalid glob pattern {pattern}: {error}")]
-    Glob {
-        pattern: String,
-        #[source]
-        error: globset::Error,
-    },
-    #[error("invalid regex pattern {pattern}: {error}")]
-    Regex {
-        pattern: String,
-        #[source]
-        error: regex::Error,
-    },
-}
-
 impl Config {
-    pub fn load_from_dir(dir: &Path) -> Result<Option<Self>, FilterError> {
+    pub fn load_from_dir(dir: &Path) -> Result<Option<Self>> {
         let path = dir.join(".nosecrets.toml");
         if !path.exists() {
             return Ok(None);
         }
-        let content = fs::read_to_string(&path).map_err(|error| FilterError::Read {
+        let content = fs::read_to_string(&path).map_err(|source| read_error(&path, source))?;
+        let config = toml::from_str(&content).map_err(|source| Error::ParseConfig {
             path: path.clone(),
-            error,
-        })?;
-        let config = toml::from_str(&content).map_err(|error| FilterError::Parse {
-            path: path.clone(),
-            error,
+            source,
         })?;
         Ok(Some(config))
     }
 }
 
-pub fn load_ignore_file(path: &Path) -> Result<Vec<IgnoreEntry>, FilterError> {
+pub fn load_ignore_file(path: &Path) -> Result<Vec<IgnoreEntry>> {
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let content = fs::read_to_string(path).map_err(|error| FilterError::Read {
-        path: path.to_path_buf(),
-        error,
-    })?;
+    let content = fs::read_to_string(path).map_err(|source| read_error(path, source))?;
     let mut entries = Vec::new();
     for line in content.lines() {
         let trimmed = line.trim();
@@ -216,9 +183,9 @@ pub fn load_ignore_file(path: &Path) -> Result<Vec<IgnoreEntry>, FilterError> {
                 let normalized = normalize_glob_pattern(glob);
                 Glob::new(&normalized)
                     .map(|g| g.compile_matcher())
-                    .map_err(|error| FilterError::Glob {
+                    .map_err(|source| Error::Glob {
                         pattern: normalized.clone(),
-                        error,
+                        source,
                     })
             })
             .transpose()?;
@@ -231,10 +198,7 @@ pub fn load_ignore_file(path: &Path) -> Result<Vec<IgnoreEntry>, FilterError> {
 }
 
 impl Filter {
-    pub fn from_config(
-        config: Option<Config>,
-        ignore_entries: Vec<IgnoreEntry>,
-    ) -> Result<Self, FilterError> {
+    pub fn from_config(config: Option<Config>, ignore_entries: Vec<IgnoreEntry>) -> Result<Self> {
         let config = config.unwrap_or_default();
         let mut all_ignore_paths: Vec<String> = DEFAULT_IGNORE_PATHS
             .iter()
@@ -242,29 +206,12 @@ impl Filter {
             .collect();
         all_ignore_paths.extend(config.ignore.paths.iter().cloned());
 
-        let ignore_paths = if all_ignore_paths.is_empty() {
-            None
-        } else {
-            let mut builder = GlobSetBuilder::new();
-            for pattern in &all_ignore_paths {
-                let normalized = normalize_glob_pattern(pattern);
-                let glob = Glob::new(&normalized).map_err(|error| FilterError::Glob {
-                    pattern: normalized.clone(),
-                    error,
-                })?;
-                builder.add(glob);
-            }
-            Some(builder.build().map_err(|error| FilterError::Glob {
-                pattern: "<globset>".to_string(),
-                error,
-            })?)
-        };
+        let ignore_paths = build_globset(&all_ignore_paths)?;
 
         let mut allow_patterns = Vec::new();
         for pattern in &config.allow.patterns {
-            let regex = Regex::new(pattern).map_err(|error| FilterError::Regex {
-                pattern: pattern.to_string(),
-                error,
+            let regex = Regex::new(pattern).map_err(|source| {
+                Error::regex(format!("invalid regex pattern {pattern}"), source)
             })?;
             allow_patterns.push(regex);
         }
@@ -327,6 +274,31 @@ impl Filter {
 pub fn normalize_path(path: &Path) -> String {
     let raw = path.to_string_lossy().replace('\\', "/");
     raw.trim_start_matches("./").to_string()
+}
+
+fn read_error(path: &Path, source: std::io::Error) -> Error {
+    Error::io(format!("failed to read {}", path.display()), source)
+}
+
+/// Compiles glob patterns into one set; `None` for an empty list.
+pub(crate) fn build_globset(patterns: &[String]) -> Result<Option<GlobSet>> {
+    if patterns.is_empty() {
+        return Ok(None);
+    }
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        let normalized = normalize_glob_pattern(pattern);
+        let glob = Glob::new(&normalized).map_err(|source| Error::Glob {
+            pattern: normalized.clone(),
+            source,
+        })?;
+        builder.add(glob);
+    }
+    let set = builder.build().map_err(|source| Error::Glob {
+        pattern: "<globset>".to_string(),
+        source,
+    })?;
+    Ok(Some(set))
 }
 
 fn normalize_glob_pattern(pattern: &str) -> String {

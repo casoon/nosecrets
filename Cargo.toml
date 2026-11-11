@@ -1,15 +1,39 @@
+[package]
+name = "nosecrets-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+# The repository root is the package, so `cargo install --path .` (used by pre-commit's
+# `language: rust`) works. Only the files below go into the published crate.
+include = ["/src/**", "/tests/**", "/README.md", "/LICENSE", "/CHANGELOG.md"]
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+nosecrets-core = { path = "crates/nosecrets-core", version = "0.4.0" }
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+
+[[bin]]
+name = "nosecrets"
+path = "src/main.rs"
+
 [workspace]
-members = [
-    "crates/nosecrets-cli",
-    "crates/nosecrets-core",
-    "crates/nosecrets-rules",
-    "crates/nosecrets-filter",
-    "crates/nosecrets-report",
-]
+members = [".", "crates/nosecrets-core"]
+default-members = [".", "crates/nosecrets-core"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.9"
+version = "0.4.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/casoon/nosecrets"

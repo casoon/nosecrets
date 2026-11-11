@@ -12,14 +12,10 @@ Performanter Secret-Scanner in Rust, fokussiert auf Pre-Commit Hooks.
 ## Architektur
 
     nosecrets/
-    ├── Cargo.toml
-    ├── crates/
-    │   ├── nosecrets-cli/        # CLI (clap)
-    │   ├── nosecrets-core/       # Detection Engine
-    │   ├── nosecrets-rules/      # Regel-Parser
-    │   ├── nosecrets-filter/     # Ignore/Allow System
-    │   └── nosecrets-report/     # Output-Formate
-    ├── crates/nosecrets-rules/
+    ├── Cargo.toml                # Paket nosecrets-cli und Workspace
+    ├── src/main.rs               # CLI (clap)
+    ├── crates/nosecrets-core/    # Bibliothek
+    │   ├── src/                  # detector, rules, filter, report, entropy, git
     │   └── rules/                # Default-Regeln (TOML)
     └── .pre-commit-hooks.yaml
 

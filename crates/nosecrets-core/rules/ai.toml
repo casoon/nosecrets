@@ -1,0 +1,99 @@
+# AI provider API keys. The patterns follow the published scanner configurations (gitleaks,
+# TruffleHog); the providers document the prefixes only, so bodies that vary in length are
+# matched with a lower bound.
+
+[[rule]]
+id = "anthropic-api-key"
+name = "Anthropic API Key"
+severity = "critical"
+pattern = '''\b(sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{80,})'''
+keywords = ["sk-ant-"]
+capture = 1
+
+[rule.validate]
+prefix = ["sk-ant-api03-", "sk-ant-admin01-"]
+min_length = 90
+
+[[rule]]
+id = "openai-api-key"
+name = "OpenAI API Key"
+severity = "critical"
+pattern = '''\b(sk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}T3BlbkFJ[A-Za-z0-9_-]{20,})'''
+keywords = ["t3blbkfj"]
+capture = 1
+
+[rule.validate]
+prefix = ["sk-"]
+min_length = 48
+
+[[rule]]
+id = "huggingface-access-token"
+name = "Hugging Face Access Token"
+severity = "critical"
+pattern = '''\b(hf_[A-Za-z]{34}|api_org_[A-Za-z]{34})\b'''
+keywords = ["hf_", "api_org_"]
+capture = 1
+
+[rule.validate]
+prefix = ["hf_", "api_org_"]
+min_length = 37
+
+[[rule]]
+id = "groq-api-key"
+name = "Groq API Key"
+severity = "critical"
+pattern = '''\b(gsk_[A-Za-z0-9]{52})\b'''
+keywords = ["gsk_"]
+capture = 1
+
+[rule.validate]
+prefix = ["gsk_"]
+length = 56
+
+[[rule]]
+id = "xai-api-key"
+name = "xAI API Key"
+severity = "critical"
+pattern = '''\b(xai-[0-9A-Za-z_]{80})\b'''
+keywords = ["xai-"]
+capture = 1
+
+[rule.validate]
+prefix = ["xai-"]
+length = 84
+
+[[rule]]
+id = "openrouter-api-key"
+name = "OpenRouter API Key"
+severity = "critical"
+pattern = '''\b(sk-or-v1-[0-9a-f]{64})\b'''
+keywords = ["sk-or-v1-"]
+capture = 1
+
+[rule.validate]
+prefix = ["sk-or-v1-"]
+length = 73
+
+[[rule]]
+id = "replicate-api-token"
+name = "Replicate API Token"
+severity = "critical"
+pattern = '''\b(r8_[0-9A-Za-z_-]{37})\b'''
+keywords = ["r8_"]
+capture = 1
+
+[rule.validate]
+prefix = ["r8_"]
+length = 40
+
+[[rule]]
+id = "perplexity-api-key"
+name = "Perplexity API Key"
+severity = "critical"
+pattern = '''\b(pplx-[A-Za-z0-9]{48})\b'''
+keywords = ["pplx-"]
+capture = 1
+
+[rule.validate]
+prefix = ["pplx-"]
+length = 53

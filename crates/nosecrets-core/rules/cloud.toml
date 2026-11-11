@@ -81,6 +81,21 @@ length = 40
 [rule.allow]
 patterns = ["example", "changeme", "your", "test", "^\\$\\{?[A-Z0-9_]+\\}?$"]
 
+# Prefixed tokens (2026): cfk_ (API key), cfut_ (user token), cfat_ (account token), each 40
+# characters plus a CRC32 checksum; cfoat_ is the Wrangler OAuth token. Cloudflare documents
+# neither the alphabet nor the checksum length, so the body is matched loosely.
+[[rule]]
+id = "cloudflare-prefixed-token"
+name = "Cloudflare Prefixed API Token"
+severity = "critical"
+pattern = '''\b(cf(?:k|ut|at|oat)_[A-Za-z0-9_.-]{40,})'''
+keywords = ["cfk_", "cfut_", "cfat_", "cfoat_"]
+capture = 1
+
+[rule.validate]
+prefix = ["cfk_", "cfut_", "cfat_", "cfoat_"]
+min_length = 44
+
 [[rule]]
 id = "cloudflare-global-api-key"
 name = "Cloudflare Global API Key"
@@ -103,3 +118,15 @@ severity = "critical"
 pattern = '''\b(v1\.0-[a-f0-9]{24}-[a-f0-9]{146})\b'''
 keywords = ["cloudflare", "v1.0-"]
 capture = 1
+
+[[rule]]
+id = "databricks-token"
+name = "Databricks Access Token"
+severity = "critical"
+pattern = '''\b(dapi[a-f0-9]{32}(?:-[0-9])?)\b'''
+keywords = ["dapi"]
+capture = 1
+
+[rule.validate]
+prefix = ["dapi"]
+min_length = 36

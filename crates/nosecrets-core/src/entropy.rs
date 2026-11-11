@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 use regex::Regex;
 
@@ -416,8 +417,18 @@ fn passes_guards(
         return false;
     }
 
+    // Generic type signature guard
+    if looks_like_generic_type(text) {
+        return false;
+    }
+
     // Code expression guard
     if looks_like_code_expression(text) {
+        return false;
+    }
+
+    // Dictionary-word guard: identifiers made of common words are not secrets
+    if config.word_filter && is_mostly_dictionary_words(text) {
         return false;
     }
 
@@ -506,7 +517,8 @@ fn looks_like_css(s: &str) -> bool {
 }
 
 fn looks_like_template_expression(s: &str) -> bool {
-    s.contains("${{")
+    looks_like_shell_or_js_interpolation(s)
+        || s.contains("${{")
         || s.contains("{{")
         || s.contains("}}")
         || s.contains("hashFiles(")
@@ -520,7 +532,72 @@ fn looks_like_code_expression(s: &str) -> bool {
     let has_chain = s.contains('.');
     let has_indexing = s.contains('[') || s.contains(']');
     let has_arrows = s.contains("=>") || s.contains("::");
-    has_call && (has_chain || has_indexing) || has_arrows
+    // Access like `os.environ["X"]` has no call parentheses; a literal token
+    // inside such an expression is still left to the entropy check.
+    (has_chain && has_indexing && !has_secret_like_run(s))
+        || has_call && (has_chain || has_indexing)
+        || has_arrows
+}
+
+/// Single-brace interpolation: `${VAR}`, `${VAR:-default}`, `${obj.prop}`.
+/// The interpolation markers are removed first; a literal token left next to
+/// them keeps the candidate in play.
+fn looks_like_shell_or_js_interpolation(s: &str) -> bool {
+    static INTERPOLATION: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\$\{[A-Za-z_][A-Za-z0-9_.]*(?::?[-=+?])?\}?").unwrap());
+    INTERPOLATION.is_match(s) && !has_secret_like_run(&INTERPOLATION.replace_all(s, " "))
+}
+
+/// Generic type signature such as `Promise<Foo<boolean>>` or `Map<string, number>`.
+fn looks_like_generic_type(s: &str) -> bool {
+    static GENERIC: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*(<[A-Za-z0-9_,\s<>\[\]]+>)+$").unwrap()
+    });
+    let opening = s.chars().filter(|&c| c == '<').count();
+    let closing = s.chars().filter(|&c| c == '>').count();
+    opening == closing && GENERIC.is_match(s) && !has_secret_like_run(s)
+}
+
+/// A run of 16 or more letters and digits that contains a digit and a letter
+/// looks like a literal token, not like an identifier.
+fn has_secret_like_run(s: &str) -> bool {
+    s.split(|c: char| !c.is_ascii_alphanumeric()).any(|run| {
+        run.len() >= 16
+            && run.chars().any(|c| c.is_ascii_digit())
+            && run.chars().any(|c| c.is_ascii_alphabetic())
+    })
+}
+
+/// Words of 4 or more letters from `words.txt`; lines starting with `#` are comments.
+static WORDS: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
+    include_str!("words.txt")
+        .lines()
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect()
+});
+
+const MIN_WORD_LEN: usize = 4;
+const MAX_WORD_LEN: usize = 24;
+
+/// True if dictionary words cover at least half of the characters of `s`.
+/// Words are searched case-insensitively as substrings, so identifier parts
+/// split by case changes, digits and separators are found as well.
+fn is_mostly_dictionary_words(s: &str) -> bool {
+    let lower = s.to_ascii_lowercase();
+    let bytes = lower.as_bytes();
+    // covered[i] = maximum number of characters covered within bytes[..i]
+    let mut covered = vec![0usize; bytes.len() + 1];
+    for end in 1..=bytes.len() {
+        covered[end] = covered[end - 1];
+        for len in MIN_WORD_LEN..=MAX_WORD_LEN.min(end) {
+            if let Some(word) = lower.get(end - len..end) {
+                if WORDS.contains(word) {
+                    covered[end] = covered[end].max(covered[end - len] + len);
+                }
+            }
+        }
+    }
+    covered[bytes.len()] * 2 >= bytes.len()
 }
 
 /// Count character groups present: lowercase, uppercase, digits, special.
@@ -709,5 +786,104 @@ URL="https://example.com/api/v1"
             matches.is_empty(),
             "should not flag prose values as high entropy"
         );
+    }
+
+    const SYNTHETIC: &str = "xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g";
+
+    fn flagged(content: &str) -> bool {
+        !detect_entropy(content, &EntropyConfig::default(), &[]).is_empty()
+    }
+
+    #[test]
+    fn test_skips_shell_interpolation() {
+        assert!(!flagged(
+            r#"echo "CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-(not set)}""#
+        ));
+        assert!(!flagged("TOKEN=${CLOUDFLARE_API_TOKEN:-fallback}"));
+    }
+
+    #[test]
+    fn test_skips_js_template_interpolation() {
+        assert!(!flagged(
+            "headers: { Authorization: `Bearer ${env.R2_SQL_TOKEN}` }"
+        ));
+    }
+
+    #[test]
+    fn test_interpolation_does_not_hide_literal_token() {
+        assert!(flagged(&format!("API_TOKEN=\"${{PREFIX}}{SYNTHETIC}\"")));
+        assert!(flagged(&format!("API_TOKEN=${{PREFIX:-{SYNTHETIC}}}")));
+    }
+
+    #[test]
+    fn test_skips_index_access_without_call() {
+        assert!(!flagged(
+            r#"token = os.environ["R2_TOKEN_FROM_ENVIRONMENT"]"#
+        ));
+        assert!(!flagged(
+            r#"const key = config.secrets["api_key_for_production"];"#
+        ));
+    }
+
+    #[test]
+    fn test_index_access_does_not_hide_literal_token() {
+        assert!(flagged(&format!(r#"api_token = cfg.{SYNTHETIC}["x"]"#)));
+        assert!(flagged(&format!(r#"api_token = "a.b[{SYNTHETIC}]""#)));
+    }
+
+    #[test]
+    fn test_skips_generic_type_signature() {
+        assert!(!flagged(
+            "returns `Promise<FlagshipEvaluationDetails<boolean>>` for the token"
+        ));
+        assert!(!flagged("authToken: Map<string, Result<Token, AuthError>>"));
+    }
+
+    #[test]
+    fn test_generic_guard_does_not_hide_literal_token() {
+        assert!(flagged(&format!("auth_token = Wrapper<{SYNTHETIC}>")));
+        assert!(flagged(&format!("auth_token = \"{SYNTHETIC}<\"")));
+    }
+
+    #[test]
+    fn test_word_filter_skips_identifiers_in_secret_context() {
+        for ident in [
+            "getUserAuthenticationTokenFromRequest",
+            "background-color-primary-hover",
+            "MAX_CONNECTION_RETRY_TIMEOUT",
+        ] {
+            let candidate = EntropyCandidate {
+                text: ident.to_string(),
+                byte_offset: 0,
+                context_name: Some("token".to_string()),
+            };
+            let on = EntropyConfig::default();
+            assert!(!passes_guards(&candidate, &on, &[]), "{ident}");
+            assert!(
+                !on.word_filter || is_mostly_dictionary_words(ident),
+                "{ident}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_word_filter_can_be_disabled() {
+        let candidate = EntropyCandidate {
+            text: "getUser2AuthenticationTokenFromRequest".to_string(),
+            byte_offset: 0,
+            context_name: Some("token".to_string()),
+        };
+        let off = EntropyConfig {
+            word_filter: false,
+            ..EntropyConfig::default()
+        };
+        assert!(!passes_guards(&candidate, &EntropyConfig::default(), &[]));
+        assert!(passes_guards(&candidate, &off, &[]));
+    }
+
+    #[test]
+    fn test_word_filter_keeps_synthetic_token() {
+        assert!(!is_mostly_dictionary_words(SYNTHETIC));
+        assert!(flagged(&format!("SECRET_TOKEN=\"{SYNTHETIC}\"")));
     }
 }

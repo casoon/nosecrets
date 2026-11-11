@@ -74,3 +74,15 @@ capture = 1
 [rule.validate]
 prefix = ["sq0csp-"]
 length = 50
+
+[[rule]]
+id = "shopify-token"
+name = "Shopify Access Token"
+severity = "high"
+pattern = '''\b(shp(?:at|ca|pa|ss)_[a-fA-F0-9]{32})\b'''
+keywords = ["shpat_", "shpca_", "shppa_", "shpss_"]
+capture = 1
+
+[rule.validate]
+prefix = ["shpat_", "shpca_", "shppa_", "shpss_"]
+length = 38

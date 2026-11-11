@@ -15,7 +15,7 @@ Fast, offline secret scanner for Git pre-commit. It checks what a commit is abou
 
 - Checks exactly what the next commit contains (the Git index), not the working tree
 - Offline only: no API calls, no verification against providers, no history scanning
-- 50 built-in rules plus your own; an entropy check for tokens no rule knows
+- 75 built-in rules plus your own; an entropy check for tokens no rule knows
 - Exceptions live in files in the repository, so they show up in code review
 - Exit status 0, 1 or 2 and JSON output for scripts and CI
 - Prefilter, regex and a format check (prefix, charset, length) keep it quiet; a commit with 10 changed files takes about 65 ms on an Apple M4 Pro ([Performance](https://casoon.github.io/nosecrets/docs/reference/performance/))
@@ -186,6 +186,7 @@ enabled = true
 min_length = 20
 threshold = 4.2
 require_context = true
+word_filter = true
 
 [entropy.allow]
 patterns = [
@@ -200,8 +201,11 @@ patterns = [
 | `min_length` | `20` | Minimum token length to consider |
 | `threshold` | `4.2` | Shannon entropy threshold (bits per char) |
 | `require_context` | `true` | Only flag tokens near secret-related variable names (`secret`, `token`, `key`, `auth`, `password`, etc.) |
+| `word_filter` | `true` | Skip candidates in which common English and programming words cover at least half of the characters (`getUserAuthenticationTokenFromRequest`, `MAX_CONNECTION_RETRY_TIMEOUT`) |
 
 When `require_context` is `true` (default), only tokens found near variable names like `SECRET_KEY`, `AUTH_TOKEN`, `password`, etc. are flagged. This dramatically reduces false positives.
+
+The entropy layer also skips values that are variable references or type signatures, not literals: `${VAR}`, `${VAR:-default}` and `${obj.prop}` interpolation, access such as `os.environ["X"]` and generic types such as `Promise<Foo<boolean>>`. A literal token next to such a construct is still reported.
 
 Entropy findings use rule ID `high-entropy-string` with severity `medium` and work with all existing filtering mechanisms (`.nosecretsignore`, inline ignores, allowlists, fingerprints).
 
@@ -227,12 +231,13 @@ A marker counts only as a separate word in a comment; `@nsi` inside an e-mail ad
 
 Rules are shipped in TOML files under `crates/nosecrets-core/rules/`:
 
-- `rules/cloud.toml` (AWS/GCP/Azure/Cloudflare, etc.)
-- `rules/deploy.toml` (Netlify, Fly.io, Heroku, Vercel, Railway, Render, Supabase)
-- `rules/code.toml` (GitHub/GitLab/npm/Slack/Discord, etc.)
-- `rules/communication.toml` (SendGrid, Twilio, Mailchimp, Mailgun)
+- `rules/ai.toml` (Anthropic, OpenAI, Hugging Face, Groq, xAI, OpenRouter, Replicate, Perplexity)
+- `rules/cloud.toml` (AWS/GCP/Azure/Cloudflare, Databricks, etc.)
+- `rules/deploy.toml` (Netlify, Fly.io, Heroku, Vercel, Railway, Render, Supabase, Doppler)
+- `rules/code.toml` (GitHub/GitLab/npm/Slack/Discord, Docker Hub, Sentry, Linear, Notion, Postman, 1Password, etc.)
+- `rules/communication.toml` (SendGrid, Twilio, Mailchimp, Mailgun, Telegram)
 - `rules/database.toml` (Postgres/MySQL/Mongo/Redis, JDBC passwords)
-- `rules/payment.toml` (Stripe)
+- `rules/payment.toml` (Stripe, Square, PayPal, Shopify)
 - `rules/generic.toml` (private keys, generic secrets, passwords)
 - High-entropy detection (unknown tokens, proprietary secrets)
 

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "type": "flow",
   "title": "How nosecrets works",
-  "description": "You run git commit. The pre-commit hook starts nosecrets, which reads the files staged for this commit from the Git index and checks them against 50 built-in rules and an entropy check, leaving out the exceptions you recorded. If a secret is left, the commit is stopped with exit code 1; otherwise it goes on with exit code 0.",
+  "description": "You run git commit. The pre-commit hook starts nosecrets, which reads the files staged for this commit from the Git index and checks them against 75 built-in rules and an entropy check, leaving out the exceptions you recorded. If a secret is left, the commit is stopped with exit code 1; otherwise it goes on with exit code 0.",
   "source": "src/main.rs, crates/nosecrets-core/src/detector.rs, crates/nosecrets-core/rules/",
   "width": 1100,
   "height": 300,
@@ -21,7 +21,7 @@
       },
       {
         "id": "check",
-        "label": "50 rules + entropy",
+        "label": "75 rules + entropy",
         "sublabel": "minus your exceptions"
       },
       {

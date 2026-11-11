@@ -550,3 +550,320 @@ fn specific_rule_wins_over_generic_rule_for_the_same_secret() {
     let findings = scan_content(&detector, &format!("STRIPE_API_KEY = \"{key}\"\n"));
     assert_eq!(findings, vec!["stripe-secret-key"]);
 }
+
+// ============================================================================
+// Newer token formats: changed provider formats, AI provider keys, developer-tool tokens
+// ============================================================================
+//
+// The fixtures are assembled at runtime from a prefix and a filler body, so that no complete
+// token appears in the source (GitHub push protection would block it) and the formats stay
+// visible in one place.
+
+const ALNUM: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789aBcDeFgHiJkLmNoPqRsTuVwXyZ";
+const HEX: &str = "0a1b2c3d4e5f67890fedcba987654321";
+const LETTERS: &str = "AbCdEfGhIjKlMnOpQrStUvWxYzaBcDeFgHiJkLmNoPqRsTuVwXyZ";
+const WORD: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_aBcDeFgHiJkLmNoPqRsTuV";
+const URLSAFE: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-aBcDeFgHiJkLmNoPqRsTuV";
+
+fn fill(len: usize, set: &str) -> String {
+    set.chars().cycle().skip(3).take(len).collect()
+}
+
+fn assert_rule_detects(rule_id: &str, token: &str) {
+    let detector = create_detector();
+    let rule_ids = scan_content(&detector, &format!("SERVICE_KEY = \"{token}\"\n"));
+    assert!(
+        rule_ids.iter().any(|id| id == rule_id),
+        "expected {rule_id} for a token of {} characters, got {rule_ids:?}",
+        token.len()
+    );
+}
+
+fn assert_rule_ignores(rule_id: &str, token: &str) {
+    let detector = create_detector();
+    let rule_ids = scan_content(&detector, &format!("SERVICE_KEY = \"{token}\"\n"));
+    assert!(
+        !rule_ids.iter().any(|id| id == rule_id),
+        "{rule_id} must not fire on {token:?}, got {rule_ids:?}"
+    );
+}
+
+#[test]
+fn detects_github_app_tokens_in_both_formats() {
+    // Legacy: 40 characters.
+    assert_rule_detects("github-app", &format!("ghu_{}", fill(36, ALNUM)));
+    assert_rule_detects("github-app", &format!("ghs_{}", fill(36, ALNUM)));
+    // Since October 2026: ghs_<app id>_<JWT>, about 520 characters with `_` and `.`.
+    let jwt = format!(
+        "{}.{}.{}",
+        fill(170, URLSAFE),
+        fill(220, URLSAFE),
+        fill(80, URLSAFE)
+    );
+    assert_rule_detects("github-app", &format!("ghs_1234567_{jwt}"));
+    assert_rule_ignores("github-app", &format!("ghs_{}", fill(20, ALNUM)));
+}
+
+#[test]
+fn detects_routable_gitlab_tokens() {
+    assert_rule_detects(
+        "gitlab-pat-routable",
+        &format!("glpat-{}.{}", fill(40, URLSAFE), "ab12cd34e"),
+    );
+    assert_rule_ignores(
+        "gitlab-pat-routable",
+        &format!("glpat-{}.abc", fill(10, ALNUM)),
+    );
+}
+
+#[test]
+fn detects_slack_app_and_configuration_tokens() {
+    let app = format!("xapp-1-A0123BCDE45-1234567890123-{}", fill(64, HEX));
+    assert_rule_detects("slack-app-config-token", &app);
+    assert_rule_detects(
+        "slack-app-config-token",
+        &format!("xoxe.xoxp-1-{}", fill(165, ALNUM)),
+    );
+    assert_rule_detects(
+        "slack-app-config-token",
+        &format!("xoxe-1-{}", fill(146, ALNUM)),
+    );
+    assert_rule_ignores("slack-app-config-token", "xapp-1-short");
+}
+
+#[test]
+fn detects_cloudflare_prefixed_tokens() {
+    for prefix in ["cfk_", "cfut_", "cfat_", "cfoat_"] {
+        assert_rule_detects(
+            "cloudflare-prefixed-token",
+            &format!("{prefix}{}", fill(46, ALNUM)),
+        );
+    }
+    assert_rule_ignores(
+        "cloudflare-prefixed-token",
+        &format!("cfk_{}", fill(12, ALNUM)),
+    );
+    assert_rule_ignores(
+        "cloudflare-prefixed-token",
+        &format!("cfx_{}", fill(46, ALNUM)),
+    );
+}
+
+#[test]
+fn detects_vercel_prefixed_tokens() {
+    for prefix in ["vcp_", "vci_", "vca_", "vcr_", "vck_"] {
+        assert_rule_detects(
+            "vercel-prefixed-token",
+            &format!("{prefix}{}", fill(40, URLSAFE)),
+        );
+    }
+    assert_rule_ignores("vercel-prefixed-token", &format!("vcp_{}", fill(8, ALNUM)));
+    assert_rule_ignores(
+        "vercel-prefixed-token",
+        &format!("vcz_{}", fill(40, URLSAFE)),
+    );
+}
+
+#[test]
+fn detects_supabase_opaque_keys() {
+    assert_rule_detects(
+        "supabase-secret-key",
+        &format!("sb_secret_{}", fill(30, URLSAFE)),
+    );
+    assert_rule_detects(
+        "supabase-personal-access-token",
+        &format!("sbp_{}", fill(40, "0123456789abcdefghijklmnopqrstuvwxyz")),
+    );
+    assert_rule_ignores(
+        "supabase-secret-key",
+        &format!("sb_publishable_{}", fill(30, URLSAFE)),
+    );
+    assert_rule_ignores(
+        "supabase-personal-access-token",
+        &format!("sbp_{}", fill(12, ALNUM)),
+    );
+}
+
+#[test]
+fn detects_ai_provider_keys() {
+    let cases: Vec<(&str, String, String)> = vec![
+        (
+            "anthropic-api-key",
+            format!("sk-ant-api03-{}AA", fill(93, URLSAFE)),
+            format!("sk-ant-api03-{}", fill(12, URLSAFE)),
+        ),
+        (
+            "anthropic-api-key",
+            format!("sk-ant-admin01-{}AA", fill(93, URLSAFE)),
+            format!("sk-ant-admin01-{}", fill(12, URLSAFE)),
+        ),
+        (
+            "openai-api-key",
+            format!("sk-proj-{}T3BlbkFJ{}", fill(58, URLSAFE), fill(58, URLSAFE)),
+            format!("sk-proj-{}", fill(60, URLSAFE)),
+        ),
+        (
+            "openai-api-key",
+            format!("sk-{}T3BlbkFJ{}", fill(20, ALNUM), fill(20, ALNUM)),
+            format!("sk-{}", fill(48, ALNUM)),
+        ),
+        (
+            "huggingface-access-token",
+            format!("hf_{}", fill(34, LETTERS)),
+            format!("hf_{}", fill(20, LETTERS)),
+        ),
+        (
+            "huggingface-access-token",
+            format!("api_org_{}", fill(34, LETTERS)),
+            format!("api_org_{}", fill(20, LETTERS)),
+        ),
+        (
+            "groq-api-key",
+            format!("gsk_{}", fill(52, ALNUM)),
+            format!("gsk_{}", fill(30, ALNUM)),
+        ),
+        (
+            "xai-api-key",
+            format!("xai-{}", fill(80, WORD)),
+            format!("xai-{}", fill(30, URLSAFE)),
+        ),
+        (
+            "openrouter-api-key",
+            format!("sk-or-v1-{}", fill(64, HEX)),
+            format!("sk-or-v1-{}", fill(20, HEX)),
+        ),
+        (
+            "replicate-api-token",
+            format!("r8_{}", fill(37, URLSAFE)),
+            format!("r8_{}", fill(20, URLSAFE)),
+        ),
+        (
+            "perplexity-api-key",
+            format!("pplx-{}", fill(48, ALNUM)),
+            format!("pplx-{}", fill(20, ALNUM)),
+        ),
+    ];
+    for (rule_id, positive, negative) in cases {
+        assert_rule_detects(rule_id, &positive);
+        assert_rule_ignores(rule_id, &negative);
+    }
+}
+
+#[test]
+fn detects_developer_tool_tokens() {
+    let cases: Vec<(&str, String, String)> = vec![
+        (
+            "onepassword-service-account-token",
+            format!("ops_eyJ{}", fill(260, ALNUM)),
+            format!("ops_eyJ{}", fill(40, ALNUM)),
+        ),
+        (
+            "dockerhub-token",
+            format!("dckr_pat_{}", fill(27, URLSAFE)),
+            format!("dckr_pat_{}", fill(10, URLSAFE)),
+        ),
+        (
+            "dockerhub-token",
+            format!("dckr_oat_{}", fill(32, URLSAFE)),
+            format!("dckr_oat_{}", fill(10, URLSAFE)),
+        ),
+        (
+            "sentry-user-token",
+            format!("sntryu_{}", fill(64, HEX)),
+            format!("sntryu_{}", fill(20, HEX)),
+        ),
+        (
+            "sentry-org-token",
+            format!("sntrys_eyJpYXQiO{}", fill(60, ALNUM)),
+            "sntrys_eyJpYXQiO".to_string(),
+        ),
+        (
+            "linear-api-key",
+            format!("lin_api_{}", fill(40, ALNUM)),
+            format!("lin_api_{}", fill(12, ALNUM)),
+        ),
+        (
+            "notion-integration-token",
+            format!("ntn_{}{}", "12345678901", fill(35, ALNUM)),
+            format!("ntn_{}", fill(10, ALNUM)),
+        ),
+        (
+            "postman-api-key",
+            format!("PMAK-{}-{}", fill(24, HEX), fill(34, HEX)),
+            format!("PMAK-{}", fill(10, HEX)),
+        ),
+        (
+            "databricks-token",
+            format!("dapi{}", fill(32, HEX)),
+            format!("dapi{}", fill(10, HEX)),
+        ),
+        (
+            "shopify-token",
+            format!("shpat_{}", fill(32, HEX)),
+            format!("shpat_{}", fill(10, HEX)),
+        ),
+        (
+            "doppler-token",
+            format!("dp.pt.{}", fill(43, ALNUM)),
+            format!("dp.pt.{}", fill(10, ALNUM)),
+        ),
+    ];
+    for (rule_id, positive, negative) in cases {
+        assert_rule_detects(rule_id, &positive);
+        assert_rule_ignores(rule_id, &negative);
+    }
+}
+
+#[test]
+fn telegram_bot_tokens_need_their_context() {
+    let detector = create_detector();
+    let token = format!("123456789:A{}", fill(34, URLSAFE));
+    let with_context = scan_content(&detector, &format!("TELEGRAM_BOT_TOKEN = \"{token}\"\n"));
+    assert!(
+        with_context.iter().any(|id| id == "telegram-bot-token"),
+        "expected telegram-bot-token, got {with_context:?}"
+    );
+    let without_context = scan_content(&detector, &format!("build_stamp = \"{token}\"\n"));
+    assert!(
+        !without_context.iter().any(|id| id == "telegram-bot-token"),
+        "no context keyword, got {without_context:?}"
+    );
+}
+
+#[test]
+fn checksum_rules_accept_valid_and_reject_altered_tokens() {
+    use nosecrets_core::parse_rules;
+    // A custom rule with `validate.checksum`. The valid token is an example from a third-party
+    // wiki that uses the 30 + 6 layout (prefix tk_), not a real credential.
+    let rules = parse_rules(
+        r#"
+        [[rule]]
+        id = "tk-token"
+        name = "Example token with checksum"
+        severity = "high"
+        pattern = '''\b(tk_[A-Za-z0-9]{36})\b'''
+        keywords = ["tk_"]
+
+        [rule.validate]
+        prefix = ["tk_"]
+        checksum = "crc32-base62-suffix6"
+        "#,
+        "inline",
+    )
+    .expect("rules");
+    let filter = Filter::from_config(None, Vec::new()).expect("filter");
+    let detector = Detector::new(rules, filter).expect("detector");
+    let valid = scan_content(
+        &detector,
+        "t = \"tk_GNrRoBa1p9nuwm7XrWkrhYUNQ7edOw4GUp8I\"\n",
+    );
+    assert!(valid.contains(&"tk-token".to_string()), "got {valid:?}");
+    let altered = scan_content(
+        &detector,
+        "t = \"tk_GNrRoBa1p9nuwm7XrWkrhYUNQ7edOw4GUp8J\"\n",
+    );
+    assert!(
+        !altered.contains(&"tk-token".to_string()),
+        "got {altered:?}"
+    );
+}

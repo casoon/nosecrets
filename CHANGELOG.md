@@ -7,13 +7,18 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- **Rules:** AI provider keys (Anthropic, OpenAI, Hugging Face, Groq, xAI, OpenRouter, Replicate, Perplexity) and developer-tool tokens (1Password, Doppler, Docker Hub, Sentry, Linear, Notion, Postman, Databricks, Shopify, Telegram bot); 75 built-in rules in total.
+- **Rules:** the changed token formats of GitHub App installation tokens, Cloudflare (`cfk_`, `cfut_`, `cfat_`, `cfoat_`), Vercel, Supabase (`sb_secret_`, `sbp_`), GitLab (routable) and Slack (`xapp-`, `xoxe`) are detected. Where the vendor documents only the prefix, the rest of the token is matched loosely.
+- **Rules:** `validate.checksum = "crc32-base62-suffix6"` for custom rules. Details: [Custom rules](https://casoon.github.io/nosecrets/docs/reference/custom-rules/).
 - **Site:** the [Showcase](https://casoon.github.io/nosecrets/showcase/) shows eight use cases as real nosecrets runs next to the files they scan, and the start page links the most common ones.
 - **README:** a recorded terminal scene and the same real examples.
+- **Entropy:** `[entropy] word_filter` (default `true`) skips candidates in which common English and programming words cover at least half of the characters, such as `getUserAuthenticationTokenFromRequest`. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
 - **Docs:** [Performance](https://casoon.github.io/nosecrets/docs/reference/performance/) lists measured timings for a commit, a tracked scan and a working-tree scan, with the machine they were taken on.
 - **Contributors:** `scripts/bench.sh` builds the release binary, generates a deterministic repository and measures the scans with hyperfine.
 
 ### Changed
 
+- **Entropy:** `${VAR}`, `${VAR:-default}` and `${obj.prop}` interpolation, access such as `os.environ["X"]` and generic type signatures such as `Promise<Foo<boolean>>` are no longer reported; a literal token next to them still is.
 - **Pages:** the project site uses the current shared theme (0.12.12).
 - **Pages:** the project site uses the shared theme 0.12.10.
 

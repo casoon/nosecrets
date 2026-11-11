@@ -62,3 +62,16 @@ capture = 1
 prefix = ["key-"]
 charset = "a-z0-9\\-"
 length = 36
+
+# Only with a "telegram" or "bot" near the value: <bot id>:A<34 characters> alone matches
+# too much unrelated text.
+[[rule]]
+id = "telegram-bot-token"
+name = "Telegram Bot Token"
+severity = "high"
+pattern = '''(?i)(?:telegram|bot)[^\n]{0,40}?\b([0-9]{5,16}:A[A-Za-z0-9_-]{34})\b'''
+keywords = ["telegram", "bot"]
+capture = 1
+
+[rule.validate]
+min_length = 41

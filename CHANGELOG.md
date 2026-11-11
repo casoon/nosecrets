@@ -12,9 +12,11 @@ All notable changes to this project are documented in this file. The format foll
 - **Rules:** `validate.checksum = "crc32-base62-suffix6"` for custom rules. Details: [Custom rules](https://casoon.github.io/nosecrets/docs/reference/custom-rules/).
 - **Site:** the [Showcase](https://casoon.github.io/nosecrets/showcase/) shows eight use cases as real nosecrets runs next to the files they scan, and the start page links the most common ones.
 - **README:** a recorded terminal scene and the same real examples.
+- **Entropy:** `[entropy] word_filter` (default `true`) skips candidates in which common English and programming words cover at least half of the characters, such as `getUserAuthenticationTokenFromRequest`. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
 
 ### Changed
 
+- **Entropy:** `${VAR}`, `${VAR:-default}` and `${obj.prop}` interpolation, access such as `os.environ["X"]` and generic type signatures such as `Promise<Foo<boolean>>` are no longer reported; a literal token next to them still is.
 - **Pages:** the project site uses the current shared theme (0.12.12).
 - **Pages:** the project site uses the shared theme 0.12.10.
 

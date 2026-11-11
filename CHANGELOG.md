@@ -5,6 +5,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-11
+
 ### Breaking
 
 - **CLI:** a scan that cannot run exits with status 2 instead of 1; status 1 now always means blocking findings. A path that does not exist is such an error instead of a clean result.

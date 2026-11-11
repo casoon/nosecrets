@@ -81,6 +81,8 @@ deploy.sh:2:24 [HIGH] Acme service token (acme-service-token) nsi_a7570523585c
 - [Machine-readable output](https://casoon.github.io/nosecrets/showcase/json/): `--format json`.
 - [A typo in the configuration](https://casoon.github.io/nosecrets/showcase/bad-config/): an error with exit status 2, never a silent pass.
 
+<p align="center"><img src=".github/readme/demo.svg" alt="nosecrets scan src/ reports a Stripe secret key as critical and a Postgres connection URI as high, each with a fingerprint and a masked preview." width="830"></p>
+
 ## Install
 
 ### curl (Apple Silicon macOS and Linux)

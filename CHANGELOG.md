@@ -24,7 +24,7 @@ All notable changes to this project are documented in this file. The format foll
 - **Output:** when several rules match the same text, only the most severe one is reported, and a specific rule wins over a generic one; findings are sorted by path, line and column.
 - **Output:** the preview reveals at most a quarter of a secret and nothing of secrets shorter than 12 characters. Fingerprints are unchanged.
 - **Scanning:** ignored directories are no longer read; path scans skip them without descending.
-- **Pages:** the project site uses the current shared theme (0.12.6).
+- **Pages:** the project site uses the current shared theme (0.12.8).
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
 - **Build:** building from source requires Rust 1.88 (was 1.85), as `sha2` 0.11 needs it.
 

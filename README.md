@@ -18,7 +18,7 @@ Fast, offline secret scanner for Git pre-commit. It checks what a commit is abou
 - 75 built-in rules plus your own; an entropy check for tokens no rule knows
 - Exceptions live in files in the repository, so they show up in code review
 - Exit status 0, 1 or 2 and JSON output for scripts and CI
-- Prefilter, regex and a format check (prefix, charset, length) keep it fast and quiet
+- Prefilter, regex and a format check (prefix, charset, length) keep it quiet; a commit with 10 changed files takes about 65 ms on an Apple M4 Pro ([Performance](https://casoon.github.io/nosecrets/docs/reference/performance/))
 
 ## In practice
 

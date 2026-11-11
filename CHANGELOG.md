@@ -13,6 +13,8 @@ All notable changes to this project are documented in this file. The format foll
 - **Site:** the [Showcase](https://casoon.github.io/nosecrets/showcase/) shows eight use cases as real nosecrets runs next to the files they scan, and the start page links the most common ones.
 - **README:** a recorded terminal scene and the same real examples.
 - **Entropy:** `[entropy] word_filter` (default `true`) skips candidates in which common English and programming words cover at least half of the characters, such as `getUserAuthenticationTokenFromRequest`. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
+- **Docs:** [Performance](https://casoon.github.io/nosecrets/docs/reference/performance/) lists measured timings for a commit, a tracked scan and a working-tree scan, with the machine they were taken on.
+- **Contributors:** `scripts/bench.sh` builds the release binary, generates a deterministic repository and measures the scans with hyperfine.
 
 ### Changed
 

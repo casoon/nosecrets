@@ -14,7 +14,7 @@ All notable changes to this project are documented in this file. The format foll
 ### Changed
 
 - **Entropy:** `${VAR}`, `${VAR:-default}` and `${obj.prop}` interpolation, access such as `os.environ["X"]` and generic type signatures such as `Promise<Foo<boolean>>` are no longer reported; a literal token next to them still is.
-- **Pages:** the project site uses the current shared theme (0.12.11).
+- **Pages:** the project site uses the current shared theme (0.12.12).
 - **Pages:** the project site uses the shared theme 0.12.10.
 
 ## [0.4.0] - 2026-11-11

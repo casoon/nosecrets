@@ -1,6 +1,6 @@
 ---
 title: CLI reference
-description: Scan modes, output formats, exit codes and ignore commands in nosecrets 0.3.8.
+description: Scan modes, output formats, exit codes and the ignore command.
 order: 1
 ---
 
@@ -26,6 +26,40 @@ repository. The tracked scan rejects an unmerged index instead of silently choos
 | `--rules <FILE>` | Load an additional TOML rule file; repeat to load more than one |
 
 Relative rule paths resolve from the repository root. Custom rules extend the built-in set.
+
+## JSON output
+
+`--format json` prints one array on standard output, empty when nothing was found:
+
+```json
+[
+  {
+    "path": "src/config.py",
+    "line": 3,
+    "column": 10,
+    "rule_id": "github-pat",
+    "rule_name": "GitHub Personal Access Token",
+    "severity": "critical",
+    "fingerprint": "nsi_1db61e13c133",
+    "preview": "ghp_...wxyz"
+  }
+]
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `path` | string | Path relative to the repository root, with `/` as separator |
+| `line` | integer | Line of the secret, starting at 1 |
+| `column` | integer | Byte column of the secret within the line, starting at 1 |
+| `rule_id` | string | ID of the rule; `high-entropy-string` for entropy findings |
+| `rule_name` | string | Display name of the rule |
+| `severity` | string | `critical`, `high`, `medium` or `low` |
+| `fingerprint` | string | `nsi_…` value accepted by `.nosecretsignore` |
+| `preview` | string | Masked secret; never the full value |
+
+Fields may be added in a release. Renaming or removing one, or changing its type, is listed
+under "Breaking" in the changelog. Notes such as skipped files go to standard error, so standard
+output stays valid JSON.
 
 ## Ignore command
 

@@ -62,6 +62,8 @@ fn finding_exits_one_and_never_prints_the_secret() {
     assert_eq!(output.status.code(), Some(EXIT_FINDINGS));
     assert!(stdout(&output).contains("github-pat"));
     assert!(!stdout(&output).contains(&fake_token()));
+    // Piped output carries no colour codes.
+    assert!(!stdout(&output).contains('\u{1b}'));
 }
 
 #[test]

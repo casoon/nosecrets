@@ -13,9 +13,9 @@ readme = "README.md"
 
 [dependencies]
 aho-corasick.workspace = true
-console.workspace = true
+anstream.workspace = true
+anstyle.workspace = true
 globset.workspace = true
-hex.workspace = true
 rayon.workspace = true
 regex.workspace = true
 serde.workspace = true

@@ -44,17 +44,36 @@ patterns = ["EXAMPLE$"]
 values = ["int_000000000000000000000000"]
 ```
 
-| Field | Purpose |
-| --- | --- |
-| `severity` | `critical`, `high`, `medium` or `low` |
-| `keywords` | Cheap prefilter terms checked before the regex |
-| `capture` | Secret capture group; defaults to 1 |
-| `generic` | `true` for a catch-all rule; a specific rule of the same severity matching the same text is reported instead |
-| `validate.prefix` | Accepted prefixes |
-| `validate.charset` | Regex character class applied to the captured value |
-| `validate.length` | Exact captured length |
-| `validate.min_length`, `max_length` | Captured length range |
-| `paths.include`, `exclude` | Path globs limiting the rule |
-| `allow.patterns`, `values` | Rule-specific exceptions |
+## Fields
 
-The repository also contains the complete [rule specification](https://github.com/casoon/nosecrets/blob/main/RULES_SPEC.md).
+| Field | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `id` | string | yes | Unique ID, shown in findings |
+| `name` | string | yes | Display name |
+| `severity` | string | yes | `critical`, `high`, `medium` or `low` |
+| `pattern` | string | yes | Regular expression containing the capture group |
+| `keywords` | list of strings | no | Cheap prefilter terms checked before the regex; without them the rule runs on every file |
+| `capture` | integer | no | Capture group holding the secret; defaults to 1 |
+| `generic` | boolean | no | `true` for a catch-all rule; a specific rule of the same severity matching the same text is reported instead |
+| `validate.prefix` | list of strings | no | Accepted prefixes of the captured value |
+| `validate.charset` | string | no | Regex character class the whole captured value must match |
+| `validate.length` | integer | no | Exact captured length |
+| `validate.min_length`, `validate.max_length` | integer | no | Captured length range |
+| `paths.include` | list of globs | no | The rule applies only to these paths |
+| `paths.exclude` | list of globs | no | The rule skips these paths |
+| `allow.patterns` | list of regexes | no | Captured values matching one of them are not reported |
+| `allow.values` | list of strings | no | Exact captured values that are not reported |
+
+## Severity
+
+| Severity | Blocks the commit | Exit status |
+| --- | --- | --- |
+| `critical`, `high`, `medium` | yes | 1 |
+| `low` | no, shown only | 0 |
+
+## Built-in rules
+
+The built-in rules use the same format and are compiled into the binary. They live in
+[`crates/nosecrets-core/rules/`](https://github.com/casoon/nosecrets/tree/main/crates/nosecrets-core/rules),
+one file per category: `cloud.toml`, `deploy.toml`, `code.toml`, `communication.toml`,
+`database.toml`, `payment.toml` and `generic.toml`.

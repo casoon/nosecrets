@@ -1,4 +1,4 @@
-use console::style;
+use anstyle::{AnsiColor, Style};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -54,33 +54,36 @@ impl Report {
     }
 
     pub fn print_terminal(&self) -> Result<()> {
-        self.write_terminal(&mut io::stdout()).map_err(write_error)
+        // `anstream` drops the colour codes when stdout is no terminal or `NO_COLOR` is set.
+        self.write_terminal(&mut anstream::stdout())
+            .map_err(write_error)
     }
 
     fn write_terminal(&self, out: &mut impl Write) -> io::Result<()> {
         if self.findings.is_empty() {
-            writeln!(out, "{}", style("No secrets found").green())?;
+            let green = AnsiColor::Green.on_default();
+            writeln!(out, "{green}No secrets found{green:#}")?;
             return Ok(());
         }
+        let dim = Style::new().dimmed();
         for finding in &self.findings {
-            let severity = match finding.severity {
-                Severity::Critical => style("CRITICAL").red().bold(),
-                Severity::High => style("HIGH").red(),
-                Severity::Medium => style("MEDIUM").yellow(),
-                Severity::Low => style("LOW").blue(),
+            let (label, colour) = match finding.severity {
+                Severity::Critical => ("CRITICAL", AnsiColor::Red.on_default().bold()),
+                Severity::High => ("HIGH", AnsiColor::Red.on_default()),
+                Severity::Medium => ("MEDIUM", AnsiColor::Yellow.on_default()),
+                Severity::Low => ("LOW", AnsiColor::Blue.on_default()),
             };
             writeln!(
                 out,
-                "{}:{}:{} [{}] {} ({}) {}",
+                "{}:{}:{} [{colour}{label}{colour:#}] {} ({}) {dim}{}{dim:#}",
                 finding.path,
                 finding.line,
                 finding.column,
-                severity,
                 finding.rule_name,
                 finding.rule_id,
-                style(&finding.fingerprint).dim()
+                finding.fingerprint
             )?;
-            writeln!(out, "  preview: {}", style(&finding.preview).dim())?;
+            writeln!(out, "  preview: {dim}{}{dim:#}", finding.preview)?;
         }
         Ok(())
     }
@@ -99,8 +102,11 @@ pub fn fingerprint_secret(secret: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(secret.as_bytes());
     let digest = hasher.finalize();
-    let hex = hex::encode(digest);
-    format!("nsi_{}", &hex[..12])
+    let hex: String = digest[..6]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("nsi_{hex}")
 }
 
 /// Masks a secret for display. At most a quarter of the characters is revealed, never more

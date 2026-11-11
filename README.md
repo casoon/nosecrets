@@ -11,7 +11,7 @@ Fast, offline secret scanner for Git pre-commit. Designed to be simple, fast, an
 
 - Pre-commit focus (no history scanning)
 - Offline only, no API calls
-- Fast scanning (regex + validation + prefilter)
+- Fast scanning: a keyword prefilter picks the rules worth running, a regex finds candidates, and a format check (prefix, charset, length) drops values that cannot be real
 - High-entropy detection for unknown secrets
 - Minimal configuration
 
@@ -172,7 +172,7 @@ Rules are shipped in TOML files under `crates/nosecrets-core/rules/`:
 
 ### Help improve the rules
 
-The built-in rules are a starting point, but this tool becomes more valuable as the rule set grows and improves. Load additional local TOML rules with `--rules <FILE>`; the format is documented in [`RULES_SPEC.md`](RULES_SPEC.md). The option may be repeated. If you discover new secret patterns or improve existing ones, please consider contributing them back.
+The built-in rules are a starting point, but this tool becomes more valuable as the rule set grows and improves. Load additional local TOML rules with `--rules <FILE>`; the format is documented under [Custom rules](https://casoon.github.io/nosecrets/docs/reference/custom-rules/). The option may be repeated. If you discover new secret patterns or improve existing ones, please consider contributing them back.
 
 **Contributions welcome:**
 - New rules for services not yet covered
@@ -227,19 +227,16 @@ cargo run -p nosecrets-cli -- scan --staged
 
 ## Release
 
-Create and push a version tag from this repository:
+1. Set the new version in `Cargo.toml` (`[workspace.package]` and the `nosecrets-core` dependency) and in `packages/npm/package.json`.
+2. Move the entries under `## [Unreleased]` in `CHANGELOG.md` to the new version.
+3. Commit, then tag and push:
 
 ```bash
-git tag v0.3.8
-git push origin v0.3.8
+git tag vX.Y.Z
+git push origin main vX.Y.Z
 ```
 
-Publish the two crates locally, library first, before creating the tag. The tag workflow then waits for CI, builds release binaries, publishes the GitHub release, and publishes the npm package with provenance.
-
-```bash
-cargo publish -p nosecrets-core
-cargo publish -p nosecrets-cli
-```
+The tag workflow waits for CI, checks that the tag matches both manifests, and then publishes everything from GitHub Actions: `nosecrets-core` and `nosecrets-cli` to crates.io and `@casoon/nosecrets` to npm (both via Trusted Publishing, after approval in the `crates-io` and `npm` environments), and the binaries with `SHA256SUMS` and build provenance to the GitHub release. Nothing is published from a developer machine.
 
 ## License
 

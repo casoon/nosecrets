@@ -4,6 +4,11 @@ description: What nosecrets reads on each commit, how it decides what is a secre
 order: 1
 ---
 
+## Scope
+
+nosecrets checks what is about to be committed. It runs offline, does not verify findings against
+provider APIs and does not scan Git history; those jobs belong to other tools.
+
 ## Exact staged contents
 
 `nosecrets scan --staged` reads the blobs selected for the next commit from the Git index, not
@@ -46,7 +51,32 @@ What remains after detection is checked against the exceptions you recorded, fro
 All of them live in files you commit, so every exception is visible in review. See
 [Configuration](../../getting-started/configuration/) for the syntax.
 
+## Fingerprints
+
+Every finding carries a fingerprint: `nsi_` followed by the first twelve hex digits of the
+SHA-256 hash of the secret. It depends on the secret alone, so it stays the same when the line
+moves, and it does not reveal the secret. `.nosecretsignore` takes one fingerprint per line,
+optionally limited to a path glob:
+
+```text
+nsi_a1b2c3d4e5f6
+nsi_b2c3d4e5f6a7:src/config.py
+```
+
+`nosecrets ignore <FINGERPRINT>` and `scan --interactive` write these lines for you.
+
+## From command to exit code
+
+1. The CLI loads `.nosecrets.toml`, the built-in rules, any `--rules` files and
+   `.nosecretsignore`. A mistake in one of them stops the run.
+2. It collects the input: changed index blobs (`--staged`), all index blobs (`--tracked`) or files
+   below the given paths. Ignored paths and files above `scan.max_file_size` are dropped before
+   their content is read; Git contents come from one batched `git cat-file` process.
+3. Files are scanned in parallel through the pipeline above.
+4. Findings are de-duplicated, sorted by path, line and column, and printed as text or JSON.
+
 ## Exit codes
 
 - `0`: no blocking findings (only `low` or none).
 - `1`: blocking findings (`critical`, `high` or `medium`). The pre-commit hook stops the commit.
+- `2`: the scan could not run, for example because of an invalid configuration.

@@ -92,6 +92,8 @@ pub struct EntropyConfig {
     pub threshold: f64,
     #[serde(default = "entropy_default_require_context")]
     pub require_context: bool,
+    #[serde(default = "entropy_default_word_filter")]
+    pub word_filter: bool,
     #[serde(default)]
     pub allow: EntropyAllowConfig,
 }
@@ -103,6 +105,7 @@ impl Default for EntropyConfig {
             min_length: entropy_default_min_length(),
             threshold: entropy_default_threshold(),
             require_context: entropy_default_require_context(),
+            word_filter: entropy_default_word_filter(),
             allow: EntropyAllowConfig::default(),
         }
     }
@@ -121,6 +124,10 @@ fn entropy_default_threshold() -> f64 {
 }
 
 fn entropy_default_require_context() -> bool {
+    true
+}
+
+fn entropy_default_word_filter() -> bool {
     true
 }
 

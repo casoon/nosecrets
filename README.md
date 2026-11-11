@@ -186,6 +186,7 @@ enabled = true
 min_length = 20
 threshold = 4.2
 require_context = true
+word_filter = true
 
 [entropy.allow]
 patterns = [
@@ -200,8 +201,11 @@ patterns = [
 | `min_length` | `20` | Minimum token length to consider |
 | `threshold` | `4.2` | Shannon entropy threshold (bits per char) |
 | `require_context` | `true` | Only flag tokens near secret-related variable names (`secret`, `token`, `key`, `auth`, `password`, etc.) |
+| `word_filter` | `true` | Skip candidates in which common English and programming words cover at least half of the characters (`getUserAuthenticationTokenFromRequest`, `MAX_CONNECTION_RETRY_TIMEOUT`) |
 
 When `require_context` is `true` (default), only tokens found near variable names like `SECRET_KEY`, `AUTH_TOKEN`, `password`, etc. are flagged. This dramatically reduces false positives.
+
+The entropy layer also skips values that are variable references or type signatures, not literals: `${VAR}`, `${VAR:-default}` and `${obj.prop}` interpolation, access such as `os.environ["X"]` and generic types such as `Promise<Foo<boolean>>`. A literal token next to such a construct is still reported.
 
 Entropy findings use rule ID `high-entropy-string` with severity `medium` and work with all existing filtering mechanisms (`.nosecretsignore`, inline ignores, allowlists, fingerprints).
 

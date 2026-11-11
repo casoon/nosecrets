@@ -23,6 +23,7 @@ enabled = true
 min_length = 20
 threshold = 4.2
 require_context = true
+word_filter = true
 
 [entropy.allow]
 patterns = ["^[a-f0-9]{32,}$"]
@@ -33,7 +34,11 @@ max_file_size = 5242880
 
 Global allow patterns and values apply to all findings. Entropy-specific patterns apply only to
 the high-entropy detector. With `require_context = true`, entropy candidates must appear near terms
-such as `secret`, `token`, `key`, `auth` or `password`.
+such as `secret`, `token`, `key`, `auth` or `password`. With `word_filter = true` (default),
+candidates in which common English and programming words cover at least half of the characters, such as
+`getUserAuthenticationTokenFromRequest` or `MAX_CONNECTION_RETRY_TIMEOUT`, are not reported.
+Interpolation like `${VAR}`, access like `os.environ["X"]` and generic types like
+`Promise<Foo<boolean>>` are skipped as well; a literal token next to them is still reported.
 
 Files larger than `scan.max_file_size` bytes (default 5 MiB) are skipped; nosecrets states on stderr
 how many. Set it to `0` to scan files of any size.

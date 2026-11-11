@@ -1,0 +1,68 @@
+---
+title: Performance
+description: What nosecrets costs per commit and per repository, measured by a script you can run yourself.
+order: 3
+---
+
+nosecrets runs on every commit, so the time it adds matters. The numbers on this page come from
+`scripts/bench.sh` in the repository; there is no other source for a speed claim on this site.
+
+## What is measured
+
+The script builds the release binary, generates a deterministic synthetic repository and times the
+commands a user runs with [hyperfine](https://github.com/sharkdp/hyperfine):
+
+- **`nosecrets --version`** is the cost of starting the process.
+- **`scan --staged` with nothing staged** is the fixed cost every commit pays before the first byte
+  is read: loading the configuration, compiling the regular expressions of all rules and asking Git
+  what is staged.
+- **`scan --staged` with 10 changed files** is a typical commit.
+- **`scan --tracked`** checks the whole repository once, as when adopting nosecrets.
+- **`scan .`** checks the working tree.
+
+The repository has 2,000 text files of about 10 kB each (20 MB: source, configuration and
+lock-file-like content), a fixed random seed so that two runs scan the same bytes, and 20 planted
+fake secrets. The planted tokens are assembled at run time and match no real account.
+
+## Results
+
+nosecrets 0.4.0, hyperfine 2.0.0; Apple M4 Pro, 14 cores, Darwin 27.2.0; load average at start 28.91.
+Repository: 2000 files, about 20 MB, 20 planted fake secrets; 50 runs per command after 5 warm-up runs.
+
+| Command | Median | Mean | Std. dev. | Min | Max |
+|---|---|---|---|---|---|
+| `nosecrets --version` | 2.3 ms | 2.3 ms | 0.2 ms | 2.0 ms | 2.7 ms |
+| `scan --staged`, nothing staged (fixed cost per commit) | 40.7 ms | 40.7 ms | 1.4 ms | 37.9 ms | 43.9 ms |
+| `scan --staged`, 10 changed files | 64.3 ms | 64.4 ms | 2.7 ms | 60.6 ms | 74.8 ms |
+| `scan --tracked`, whole repository | 298.3 ms | 300.2 ms | 16.5 ms | 277.7 ms | 341.4 ms |
+| `scan .`, working tree | 89.0 ms | 91.3 ms | 18.7 ms | 74.2 ms | 197.6 ms |
+
+Two consecutive runs gave medians within 2 % of each other for the staged and tracked scans.
+`scan .` (77 and 89 ms) and the process start (2.0 and 2.3 ms) varied more. Both runs were made on
+a machine that was not idle (load average about 30, see above); on a quiet machine the figures
+are lower and steadier.
+
+A typical commit, 10 changed files, takes about 64 ms here, of which about 40 ms is the fixed cost.
+
+These numbers describe the machine named above and nothing else. A busy machine, a cold disk cache
+or a slower disk changes them; the median is the figure to compare, the maximum shows how much a
+single run can stray.
+
+## Where the time goes
+
+A commit costs a fixed amount plus time that grows with what the commit changes. The fixed part is
+mostly compiling the regular expressions of the built-in rules, which happens once per process
+and took about 15 ms when measured on its own, and starting Git twice (finding the repository
+and listing the staged files), about 8 and 10 ms each here. The part that grows is reading and scanning the staged
+files, which runs in parallel across files.
+
+## Run it yourself
+
+```sh
+brew install hyperfine   # or: cargo install hyperfine
+scripts/bench.sh
+```
+
+`BENCH_RUNS` (default 50) and `BENCH_FILES` (default 2000) change the size of the run. The script
+prints the table to standard output and changes nothing in the repository. It is meant for a quiet
+machine before a release; there is no benchmark job in CI.

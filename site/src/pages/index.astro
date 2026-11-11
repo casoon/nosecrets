@@ -1,6 +1,7 @@
 ---
 import { readFile } from 'node:fs/promises';
 import {
+  AnchorGrid,
   Badge,
   Badges,
   Button,
@@ -12,6 +13,8 @@ import {
   Install,
   Quickstart,
   ReleaseHighlights,
+  Spotlight,
+  Terminal,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
 import config from 'virtual:casoon-pages/config';
@@ -20,6 +23,15 @@ import { url } from '@casoon/pages-theme/url';
 // Animated SVG built with castwright from site/captures/scan.terminal.yaml (real runs, see capture.sh).
 import scanSvg from '../../captures/scan.svg?url';
 import Diagram from '../components/Diagram.astro';
+// Real sessions recorded by site/captures/usecases.sh; the same ones the showcase shows.
+import adoptRun from '../../captures/usecases/adopt/transcript.ansi?raw';
+import teamRule from '../../captures/usecases/team-rule/files/team-rules.toml?raw';
+
+const hookConfig = `repos:
+  - repo: https://github.com/casoon/nosecrets
+    rev: v${config.version}
+    hooks:
+      - id: nosecrets-system`;
 
 const usage = `nosecrets scan --tracked   # once, for what is already there
 nosecrets scan --staged    # on every commit, in the hook`;
@@ -63,6 +75,36 @@ const latestRelease = config.changelog
     />
   </Hero>
 
+  <AnchorGrid
+    heading="Which situation are you in?"
+    items={[
+      {
+        label: 'Stop a leak',
+        title: 'A key is about to be committed',
+        body: 'See the commit stop, and why a deleted line does not fool it.',
+        href: url('showcase/leaked-key/'),
+      },
+      {
+        label: 'Adopt it',
+        title: 'The repository already exists',
+        body: 'Check everything once, accept known old values by fingerprint.',
+        href: url('showcase/adopt/'),
+      },
+      {
+        label: 'Exceptions',
+        title: 'A test value is on purpose',
+        body: 'Inline marker, ignored paths, fingerprints: all reviewable.',
+        href: url('showcase/exceptions/'),
+      },
+      {
+        label: 'In CI',
+        title: 'Scripts need an answer',
+        body: 'Exit status 0, 1 or 2, and JSON for everything else.',
+        href: url('showcase/json/'),
+      },
+    ]}
+  />
+
   <Features
     heading="Who it is for"
     items={[
@@ -93,6 +135,36 @@ const latestRelease = config.changelog
       { value: '3', label: 'ways to install: curl, npm, cargo' },
     ]}
   />
+
+  <Spotlight
+    eyebrow="Adopt it"
+    title="Start with the repository you already have"
+    lead="`nosecrets scan --tracked` checks every file Git tracks once. What you decide to keep is accepted by fingerprint and path, in a file that is part of the repository."
+    points={[
+      'Nothing is rewritten and nothing leaves your machine.',
+      'Each accepted value is one line in `.nosecretsignore`, visible in review.',
+      'From then on the hook checks only what a commit adds.',
+    ]}
+    links={[{ label: 'More examples', href: url('showcase/') }]}
+  >
+    <Terminal title="nosecrets" ansi={adoptRun} />
+  </Spotlight>
+
+  <Spotlight
+    eyebrow="Your team"
+    title="One hook, one file for your own formats"
+    lead="Add the hook to `.pre-commit-config.yaml` and every contributor is covered. Internal token formats get a rule of a few lines, loaded with `--rules`."
+    points={[
+      'Works with pre-commit, prek, lefthook, husky or a plain Git hook.',
+      'Rules, exceptions and the scan limit sit in files in the repository.',
+      'A mistake in a rule or in the configuration is an error, never a silent pass.',
+    ]}
+    links={[{ label: 'Custom rules', href: url('docs/reference/custom-rules/') }]}
+    reverse
+  >
+    <CodeBlock code={hookConfig} lang="yaml" label=".pre-commit-config.yaml" />
+    <CodeBlock code={teamRule} lang="toml" label="team-rules.toml" />
+  </Spotlight>
 
   <section class="how" aria-labelledby="how-heading">
     <h2 id="how-heading">How it works</h2>

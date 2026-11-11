@@ -1,0 +1,8 @@
+[2m$[0m git add deploy.py .env
+[2m$[0m nosecrets scan --staged
+.env:2:31 [[31mHIGH[0m] Postgres Connection URI (postgres-connection-uri) [2mnsi_31013ade6422[0m
+  preview: [2mTr0...[0m
+deploy.py:3:17 [[1m[31mCRITICAL[0m] GitHub Personal Access Token (github-pat) [2mnsi_5e31772c2cb9[0m
+  preview: [2mghp_...PeXq[0m
+[2m$[0m echo $?
+1

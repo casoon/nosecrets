@@ -1,0 +1,9 @@
+[2m$[0m nosecrets scan --tracked
+legacy/import_users.py:2:17 [[1m[31mCRITICAL[0m] GitHub Personal Access Token (github-pat) [2mnsi_5e31772c2cb9[0m
+  preview: [2mghp_...PeXq[0m
+[2m$[0m nosecrets ignore nsi_5e31772c2cb9 --path legacy/import_users.py
+Added ignore entry to .nosecretsignore
+[2m$[0m cat .nosecretsignore
+nsi_5e31772c2cb9:legacy/import_users.py
+[2m$[0m nosecrets scan --tracked
+[32mNo secrets found[0m

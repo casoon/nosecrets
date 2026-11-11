@@ -1,0 +1,16 @@
+# .nosecrets.toml
+[entropy]
+treshold = 4.5
+
+# deploy.py
+import requests
+
+GITHUB_TOKEN = "ghp_R2kT9xLm4Qv7Bn3Zc8Wd5Hf1Jg6Ys0AaPeXq"
+
+def release(version):
+    return requests.post(
+        "https://api.github.com/repos/acme/app/releases",
+        headers={"Authorization": f"token {GITHUB_TOKEN}"},
+        json={"tag_name": version},
+    )
+

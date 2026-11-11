@@ -1,0 +1,4 @@
+nosecrets scan --tracked
+nosecrets ignore nsi_5e31772c2cb9 --path legacy/import_users.py
+cat .nosecretsignore
+nosecrets scan --tracked

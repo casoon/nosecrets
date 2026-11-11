@@ -1,0 +1,7 @@
+[2m$[0m git add config.py
+[2m$[0m sed -i.bak '/GITHUB_TOKEN/d' config.py && rm config.py.bak
+[2m$[0m cat config.py
+API_URL = "https://api.acme.example"
+[2m$[0m nosecrets scan --staged
+config.py:2:17 [[1m[31mCRITICAL[0m] GitHub Personal Access Token (github-pat) [2mnsi_5e31772c2cb9[0m
+  preview: [2mghp_...PeXq[0m

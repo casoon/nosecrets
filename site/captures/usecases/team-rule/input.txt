@@ -1,0 +1,13 @@
+# deploy.sh
+#!/bin/sh
+curl -H "X-Acme-Token: acme_Vn4Kq8Zx2Lm7Tc1Rw5Bh9Dj3" https://deploy.acme.example/run
+
+# team-rules.toml
+[[rule]]
+id = "acme-service-token"
+name = "Acme service token"
+severity = "high"
+pattern = '''\b(acme_[A-Za-z0-9]{24})\b'''
+keywords = ["acme_"]
+capture = 1
+

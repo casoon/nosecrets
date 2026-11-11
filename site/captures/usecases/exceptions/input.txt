@@ -1,0 +1,11 @@
+# .nosecrets.toml
+[ignore]
+paths = ["tests/fixtures/"]
+
+# app.py
+DOC_EXAMPLE = "ghp_R2kT9xLm4Qv7Bn3Zc8Wd5Hf1Jg6Ys0AaPeXq"  # @nsi documented example value
+STAGING = "ghp_Zp3Lk8Vn2Xc6Qw1Rt5Mb9Hd4Jf7Ys0GaNeUo"
+
+# tests/fixtures/tokens.py
+FIXTURE = "ghp_Qw8Er5Ty2Ui7Op1As4Df9Gh3Jk6Lz0XcVbNm"
+

@@ -1,0 +1,10 @@
+[2m$[0m git add deploy.py
+[2m$[0m nosecrets scan --staged
+Error: failed to parse .nosecrets.toml: TOML parse error at line 2, column 1
+  |
+2 | treshold = 4.5
+  | ^^^^^^^^
+unknown field `treshold`, expected one of `enabled`, `min_length`, `threshold`, `require_context`, `allow`
+
+[2m$[0m echo $?
+2

@@ -1,0 +1,4 @@
+[2m$[0m git add deploy.sh
+[2m$[0m nosecrets scan --staged --rules team-rules.toml
+deploy.sh:2:24 [[31mHIGH[0m] Acme service token (acme-service-token) [2mnsi_a7570523585c[0m
+  preview: [2macme...[0m

@@ -1,0 +1,15 @@
+# Checked in CI by cargo-deny: advisories, licences, duplicate versions, crate sources.
+
+[advisories]
+version = 2
+
+[licenses]
+version = 2
+allow = ["MIT", "Apache-2.0", "Unicode-3.0"]
+
+[bans]
+multiple-versions = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

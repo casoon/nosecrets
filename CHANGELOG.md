@@ -27,6 +27,10 @@ All notable changes to this project are documented in this file. The format foll
 - **Pages:** the project site uses the current shared theme (0.12.6).
 - **Site:** the start page now carries a release teaser and an FAQ (theme 0.11.1).
 - **Build:** building from source requires Rust 1.88 (was 1.85), as `sha2` 0.11 needs it.
+- **Crates:** `nosecrets-core` and `nosecrets-cli` are published from the release workflow via Trusted Publishing, after approval in the `crates-io` environment; no local `cargo publish`.
+- **Dependencies:** `toml` 1.x; `console` and `hex` are no longer used.
+- **Docs:** concept, architecture and rule format are documented in one place, the [project documentation](https://casoon.github.io/nosecrets/docs/concepts/how-it-works/); `CONCEPT.md`, `ARCHITECTURE.md` and `RULES_SPEC.md` are removed. The JSON output is specified in the [CLI reference](https://casoon.github.io/nosecrets/docs/reference/cli/#json-output).
+- **Contributors:** CI checks advisories and licences with `cargo-deny`, actions are pinned to commit SHAs, and Dependabot proposes weekly updates.
 
 ### Fixed
 

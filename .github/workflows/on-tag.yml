@@ -13,12 +13,12 @@ jobs:
   verify-ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Wait for CI to complete
         run: |
           echo "Waiting for CI workflow to complete..."
-          for i in {1..30}; do
+          for _ in {1..30}; do
             STATUS=$(gh run list --commit ${{ github.sha }} --workflow=ci.yml --json status,conclusion --jq '.[0]')
             RUNNING=$(echo "$STATUS" | jq -r '.status')
             CONCLUSION=$(echo "$STATUS" | jq -r '.conclusion')
@@ -48,6 +48,44 @@ jobs:
           NPM_VERSION=$(node -p "require('./packages/npm/package.json').version")
           test "$VERSION" = "$CARGO_VERSION"
           test "$VERSION" = "$NPM_VERSION"
+
+  crates:
+    needs: verify-ci
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+
+      # Trusted Publishing: a short-lived token from the workflow's OIDC identity,
+      # no registry secret is stored.
+      - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+        id: auth
+
+      - name: Publish crates
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Library first; versions that already exist are skipped, so a re-run is safe.
+          for crate in nosecrets-core nosecrets-cli; do
+            if curl -fsS -A "nosecrets-release (github.com/casoon/nosecrets)" \
+              "https://crates.io/api/v1/crates/$crate/$VERSION" > /dev/null 2>&1; then
+              echo "$crate $VERSION already published, skipping."
+            else
+              cargo publish --locked -p "$crate"
+            fi
+          done
 
   build:
     needs: verify-ci
@@ -79,15 +117,16 @@ jobs:
             binary-name: nosecrets.exe
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
+          toolchain: stable
           targets: ${{ matrix.target }}
 
       - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Install cross
         if: matrix.target == 'aarch64-unknown-linux-gnu'
@@ -117,11 +156,11 @@ jobs:
           7z a ${{ matrix.asset-name }} ${{ matrix.binary-name }}
 
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-path: ${{ matrix.asset-name }}
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.target }}
           path: ${{ matrix.asset-name }}
@@ -132,10 +171,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           pattern: release-*
@@ -143,7 +182,7 @@ jobs:
 
       - name: Generate checksums
         working-directory: artifacts
-        run: sha256sum * > SHA256SUMS
+        run: sha256sum -- * > SHA256SUMS
 
       - name: Create GitHub release
         run: gh release create "${{ github.ref_name }}" artifacts/* --generate-notes
@@ -159,9 +198,9 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org

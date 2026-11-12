@@ -5,13 +5,18 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-12
+
+### Added
+
+- **Releases:** statically linked musl binaries for Linux x64 and arm64 (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`), so nosecrets runs on Alpine and other musl-based CI containers. `install.sh` and the npm wrapper pick them automatically on musl systems.
+
 ## [0.5.0] - 2026-11-12
 
 ### Added
 
 - **Output:** `--format sarif` prints a SARIF 2.1.0 log for GitHub code scanning. Details: [CLI reference](https://casoon.github.io/nosecrets/docs/reference/cli/).
 - **Agents:** `nosecrets hook claude-code` is a Claude Code `PreToolUse` hook that blocks `git commit` (also `git -C`, `-a`/`-am` and chained `git add && git commit`) when the content to be committed contains a secret; it exits `2` with the masked findings and a remediation hint on standard error, and `0` on its own errors. Details: [Coding agents](https://casoon.github.io/nosecrets/docs/guides/coding-agents/).
-- **Releases:** statically linked musl binaries for Linux x64 and arm64 (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`), so nosecrets runs on Alpine and other musl-based CI containers. `install.sh` and the npm wrapper pick them automatically on musl systems.
 - **Rules:** AI provider keys (Anthropic, OpenAI, Hugging Face, Groq, xAI, OpenRouter, Replicate, Perplexity) and developer-tool tokens (1Password, Doppler, Docker Hub, Sentry, Linear, Notion, Postman, Databricks, Shopify, Telegram bot); 75 built-in rules in total.
 - **Rules:** the changed token formats of GitHub App installation tokens, Cloudflare (`cfk_`, `cfut_`, `cfat_`, `cfoat_`), Vercel, Supabase (`sb_secret_`, `sbp_`), GitLab (routable) and Slack (`xapp-`, `xoxe`) are detected. Where the vendor documents only the prefix, the rest of the token is matched loosely.
 - **Rules:** `validate.checksum = "crc32-base62-suffix6"` for custom rules. Details: [Custom rules](https://casoon.github.io/nosecrets/docs/reference/custom-rules/).

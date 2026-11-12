@@ -1,0 +1,82 @@
+---
+title: Coding agents
+description: Block git commit with secrets in Claude Code through a PreToolUse hook.
+order: 1
+---
+
+Coding agents commit on your behalf and often never run the Git hooks you installed.
+`nosecrets hook claude-code` plugs into the agent's own hook system: before Claude Code runs a
+`git commit`, nosecrets scans what the commit is about to contain and blocks the call when it
+finds a secret. The reason goes back to the model, so it can fix the file and try again.
+
+## Setup
+
+Add the hook to `.claude/settings.json` in the repository (or to `~/.claude/settings.json` for
+all repositories). `nosecrets` must be on the `PATH` of the shell Claude Code runs in; see
+[Installation](../../getting-started/installation/).
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "nosecrets hook claude-code" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook reads the JSON that Claude Code sends on standard input (`tool_name`,
+`tool_input.command` and `cwd`). It does nothing for other tools and for commands that are not
+a `git commit`, and it does not scan in that case.
+
+## What is scanned
+
+For a `git commit`, nosecrets runs the equivalent of `nosecrets scan --staged` in the
+repository of the command, with that repository's `.nosecrets.toml` and `.nosecretsignore`.
+Which repository that is follows the command:
+
+- `git -C <dir> commit` and `cd <dir> && git commit` use `<dir>`, relative to the `cwd` that Claude Code reports.
+- `git commit -a`, `-am` and `--all` additionally scan the working-tree version of tracked
+  files with unstaged changes, because the commit stages them.
+- `git add ... && git commit` additionally scans the unstaged changes and the untracked files that are not ignored by Git, because the `git add` has not run yet when the hook is called. This covers more files than a narrow `git add <path>` would stage.
+
+## When it blocks
+
+If a critical, high or medium finding is present, the hook prints each finding to standard error
+with path, line, rule ID, fingerprint and a masked preview, plus a hint on how to proceed, and
+exits with code `2`. Claude Code then blocks the call and shows the text to the model.
+The secret itself is never printed.
+
+To accept a finding on purpose, run `nosecrets ignore <fingerprint>` (optionally with
+`--path`) or put an `@nsi` marker on the line; see [How it works](../../concepts/how-it-works/).
+
+## Exit codes
+
+The hook has its own contract, separate from the [scan exit codes](../../reference/cli/#exit-codes):
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Not a commit, no blocking findings, or the hook could not check (a warning is printed to standard error). |
+| `2` | Blocking findings; Claude Code blocks the command. |
+
+Errors inside the hook (invalid JSON on standard input, a directory that is not a Git
+repository, an invalid configuration, a Git or read error) print a warning and exit `0`. Claude
+Code treats every other non-zero code as a non-blocking error anyway, and a misconfigured hook
+should not stop the agent from working. The cost is that a commit goes through unchecked when the
+hook cannot run, so keep `nosecrets scan --staged` as a pre-commit hook for your own commits.
+
+## Limits
+
+- The command is split into words on `&&`, `||`, `;`, `|`, `&` and line breaks. Text in quotes
+  is one word, so `echo "git commit"` is not a commit. This is a lexical check, not a shell
+  parser.
+- Commits that are not spelled out in the command are not seen: `bash -c 'git commit'`,
+  `$(...)`, scripts, aliases, shell functions and `git commit` run by another tool.
+- `cd` with `~`, variables or `-` is not resolved. `git commit <path>` (commit only those files) is checked like a plain `git commit`.
+- Only the `Bash` tool is checked, not file writes or other tools.
+- The settings snippet is documented from the [Claude Code hooks reference](https://code.claude.com/docs/en/hooks).

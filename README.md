@@ -296,6 +296,28 @@ With [husky](https://typicode.github.io/husky/) (`.husky/pre-commit`) or as a pl
 nosecrets scan --staged
 ```
 
+## Coding agents
+
+Agents often commit without running Git hooks. `nosecrets hook claude-code` is a Claude Code
+`PreToolUse` hook that scans the content of a `git commit` before it runs and blocks the call
+with exit code `2` when it finds a secret. In `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "nosecrets hook claude-code" }]
+      }
+    ]
+  }
+}
+```
+
+Errors inside the hook print a warning and exit `0`, so a misconfiguration never blocks the agent.
+Details and limits: [Coding agents](https://casoon.github.io/nosecrets/docs/guides/coding-agents/).
+
 ## Development
 
 ```

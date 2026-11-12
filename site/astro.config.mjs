@@ -20,6 +20,7 @@ export default defineConfig({
       mdxComponents: './src/mdx-components.ts',
       docsGroups: {
         'getting-started': 'Getting started',
+        guides: 'Guides',
         concepts: 'Concepts',
         reference: 'Reference',
       },

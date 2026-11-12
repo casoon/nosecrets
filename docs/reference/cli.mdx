@@ -90,7 +90,19 @@ nosecrets ignore [--path <PATH>] [--file <FILE>] <FINGERPRINT>
 Without `--file`, the command appends to `.nosecretsignore` in the repository root. `--path`
 restricts the fingerprint to a path glob.
 
+## Hook command
+
+```text
+nosecrets hook claude-code
+```
+
+Reads a Claude Code `PreToolUse` hook JSON from standard input and blocks `git commit` when the
+content to be committed contains a secret. It has its own exit codes (`0` or `2`), described in
+[Coding agents](../../guides/coding-agents/).
+
 ## Exit codes
+
+These codes apply to `scan`; the hook command has [its own](../../guides/coding-agents/#exit-codes).
 
 - `0`: no critical, high or medium findings; low-severity findings may still be shown.
 - `1`: at least one critical, high or medium finding.

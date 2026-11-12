@@ -143,6 +143,76 @@ fn oversized_files_are_reported_on_stderr() {
     assert!(stderr(&output).contains("skipped 1 file(s)"));
 }
 
+fn git(dir: &Path, args: &[&str]) {
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .status()
+        .expect("run git");
+    assert!(status.success(), "git {args:?}");
+}
+
+fn git_repo() -> TempDir {
+    let dir = tempdir().expect("tempdir");
+    git(dir.path(), &["init", "-q"]);
+    dir
+}
+
+fn hook(dir: &Path, input: &str) -> Output {
+    use std::io::Write;
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nosecrets"))
+        .args(["hook", "claude-code"])
+        .current_dir(dir)
+        .env(
+            "GIT_CEILING_DIRECTORIES",
+            dir.parent().expect("temp dir has a parent"),
+        )
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn nosecrets");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(input.as_bytes())
+        .expect("write stdin");
+    child.wait_with_output().expect("wait")
+}
+
+fn bash_input(cwd: &Path, command: &str) -> String {
+    serde_json::json!({
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": { "command": command },
+        "cwd": cwd,
+    })
+    .to_string()
+}
+
+fn assert_blocked(output: &Output) {
+    assert_eq!(output.status.code(), Some(EXIT_ERROR), "{}", stderr(output));
+    let err = stderr(output);
+    assert!(err.contains("github-pat"));
+    assert!(err.contains("nsi_"));
+    assert!(err.contains("nosecrets ignore"));
+    assert!(!err.contains(&fake_token()));
+    assert!(stdout(output).is_empty());
+}
+
+fn staged_token_repo() -> TempDir {
+    let dir = git_repo();
+    fs::write(
+        dir.path().join("config.py"),
+        format!("token = \"{}\"\n", fake_token()),
+    )
+    .expect("write");
+    git(dir.path(), &["add", "config.py"]);
+    dir
+}
+
 fn base64_standard(input: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
@@ -170,6 +240,133 @@ fn dir_with_base64_finding() -> TempDir {
     )
     .expect("write");
     dir
+}
+
+#[test]
+fn hook_ignores_other_tools() {
+    let dir = staged_token_repo();
+    let input = serde_json::json!({
+        "tool_name": "Write",
+        "tool_input": { "command": "git commit -m x" },
+        "cwd": dir.path(),
+    })
+    .to_string();
+    let output = hook(dir.path(), &input);
+    assert_eq!(output.status.code(), Some(EXIT_OK));
+    assert!(stderr(&output).is_empty());
+}
+
+#[test]
+fn hook_does_not_scan_other_commands() {
+    // The staged token would block a commit; `git status` must pass without a scan.
+    let dir = staged_token_repo();
+    for command in ["git status", "git commit-tree HEAD", "echo \"git commit\""] {
+        let output = hook(dir.path(), &bash_input(dir.path(), command));
+        assert_eq!(output.status.code(), Some(EXIT_OK), "{command}");
+        assert!(stderr(&output).is_empty(), "{command}");
+    }
+}
+
+#[test]
+fn hook_blocks_commit_with_staged_secret() {
+    let dir = staged_token_repo();
+    let output = hook(dir.path(), &bash_input(dir.path(), "git commit -m x"));
+    assert_blocked(&output);
+}
+
+#[test]
+fn hook_allows_commit_with_clean_stage() {
+    let dir = git_repo();
+    fs::write(dir.path().join("main.py"), "print(1)\n").expect("write");
+    git(dir.path(), &["add", "main.py"]);
+    let output = hook(dir.path(), &bash_input(dir.path(), "git commit -m x"));
+    assert_eq!(output.status.code(), Some(EXIT_OK));
+    assert!(stderr(&output).is_empty());
+}
+
+#[test]
+fn hook_warns_and_allows_on_invalid_json() {
+    let dir = tempdir().expect("tempdir");
+    let output = hook(dir.path(), "not json");
+    assert_eq!(output.status.code(), Some(EXIT_OK));
+    assert!(stderr(&output).contains("warning"));
+}
+
+#[test]
+fn hook_warns_and_allows_outside_a_repository() {
+    let dir = tempdir().expect("tempdir");
+    let output = hook(dir.path(), &bash_input(dir.path(), "git commit -m x"));
+    assert_eq!(output.status.code(), Some(EXIT_OK));
+    assert!(stderr(&output).contains("warning"));
+}
+
+/// A path as it appears in a shell command: the hook reads the command like Bash does, where a
+/// backslash is an escape character, so Windows paths are written with forward slashes.
+fn shell_path(path: &Path) -> String {
+    path.display().to_string().replace('\\', "/")
+}
+
+#[test]
+fn hook_follows_git_dash_c() {
+    let repo = staged_token_repo();
+    let elsewhere = tempdir().expect("tempdir");
+    let command = format!("git -C {} commit -m x", shell_path(repo.path()));
+    let output = hook(elsewhere.path(), &bash_input(elsewhere.path(), &command));
+    assert_blocked(&output);
+}
+
+#[test]
+fn hook_follows_cd_in_a_chain() {
+    let repo = staged_token_repo();
+    let other = tempdir().expect("tempdir");
+    let command = format!("cd {} && git commit -m x", shell_path(repo.path()));
+    let output = hook(other.path(), &bash_input(other.path(), &command));
+    assert_blocked(&output);
+}
+
+#[test]
+fn hook_scans_unstaged_changes_for_commit_all() {
+    let dir = git_repo();
+    fs::write(dir.path().join("config.py"), "token = \"none\"\n").expect("write");
+    git(dir.path(), &["add", "config.py"]);
+    git(
+        dir.path(),
+        &[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.com",
+            "commit",
+            "-q",
+            "-m",
+            "init",
+        ],
+    );
+    fs::write(
+        dir.path().join("config.py"),
+        format!("token = \"{}\"\n", fake_token()),
+    )
+    .expect("write");
+
+    let plain = hook(dir.path(), &bash_input(dir.path(), "git commit -m x"));
+    assert_eq!(plain.status.code(), Some(EXIT_OK));
+    for command in ["git commit -am x", "git commit --all -m x"] {
+        let output = hook(dir.path(), &bash_input(dir.path(), command));
+        assert_blocked(&output);
+    }
+}
+
+#[test]
+fn hook_scans_files_added_earlier_in_the_chain() {
+    let dir = git_repo();
+    fs::write(
+        dir.path().join("config.py"),
+        format!("token = \"{}\"\n", fake_token()),
+    )
+    .expect("write");
+    let command = "git add . && git commit -m x";
+    let output = hook(dir.path(), &bash_input(dir.path(), command));
+    assert_blocked(&output);
 }
 
 #[test]

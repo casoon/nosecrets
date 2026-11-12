@@ -1,3 +1,5 @@
+mod hook;
+
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -23,6 +25,20 @@ enum Commands {
     Scan(ScanArgs),
     /// Add an ignore entry to .nosecretsignore
     Ignore(IgnoreArgs),
+    /// Run as a hook of a coding agent
+    Hook(HookArgs),
+}
+
+#[derive(Parser, Debug)]
+struct HookArgs {
+    #[command(subcommand)]
+    target: HookTarget,
+}
+
+#[derive(Subcommand, Debug)]
+enum HookTarget {
+    /// Claude Code PreToolUse hook: read the hook JSON from stdin and block `git commit` with secrets
+    ClaudeCode,
 }
 
 #[derive(Parser, Debug)]
@@ -75,6 +91,9 @@ fn main() {
     let result = match cli.command {
         Commands::Scan(args) => run_scan(args),
         Commands::Ignore(args) => run_ignore(args).map(|()| 0),
+        Commands::Hook(args) => Ok(match args.target {
+            HookTarget::ClaudeCode => hook::run_claude_code(),
+        }),
     };
     match result {
         Ok(code) => std::process::exit(code),
@@ -90,25 +109,7 @@ fn run_scan(args: ScanArgs) -> Result<i32> {
     let repo_root = discover_repo_root(&cwd)?;
     let root = repo_root.clone().unwrap_or(cwd);
 
-    let config = Config::load_from_dir(&root)?;
-    let entropy_config = config
-        .as_ref()
-        .map(|c| c.entropy.clone())
-        .unwrap_or_default();
-    let ignore_entries = load_ignore_file(&root.join(".nosecretsignore"))?;
-    let filter = Filter::from_config(config, ignore_entries)?;
-    let mut rules = load_builtin_rules()?;
-    for rule_file in &args.rule_files {
-        let path = if rule_file.is_absolute() {
-            rule_file.clone()
-        } else {
-            root.join(rule_file)
-        };
-        let content = fs::read_to_string(&path)
-            .with_context(|| format!("failed to read rules from {}", path.display()))?;
-        rules.extend(parse_rules(&content, &path.display().to_string())?);
-    }
-    let detector = Detector::with_entropy(rules, filter, entropy_config)?;
+    let detector = build_detector(&root, &args.rule_files)?;
 
     let findings = if args.staged || args.tracked {
         let Some(repo_root) = repo_root else {
@@ -141,6 +142,28 @@ fn run_scan(args: ScanArgs) -> Result<i32> {
         eprintln!("skipped {skipped} file(s) larger than the configured scan.max_file_size");
     }
     Ok(if args.dry_run { 0 } else { report.exit_code() })
+}
+
+fn build_detector(root: &Path, rule_files: &[PathBuf]) -> Result<Detector> {
+    let config = Config::load_from_dir(root)?;
+    let entropy_config = config
+        .as_ref()
+        .map(|c| c.entropy.clone())
+        .unwrap_or_default();
+    let ignore_entries = load_ignore_file(&root.join(".nosecretsignore"))?;
+    let filter = Filter::from_config(config, ignore_entries)?;
+    let mut rules = load_builtin_rules()?;
+    for rule_file in rule_files {
+        let path = if rule_file.is_absolute() {
+            rule_file.clone()
+        } else {
+            root.join(rule_file)
+        };
+        let content = fs::read_to_string(&path)
+            .with_context(|| format!("failed to read rules from {}", path.display()))?;
+        rules.extend(parse_rules(&content, &path.display().to_string())?);
+    }
+    Ok(Detector::with_entropy(rules, filter, entropy_config)?)
 }
 
 fn run_ignore(args: IgnoreArgs) -> Result<()> {

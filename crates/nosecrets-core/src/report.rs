@@ -1,7 +1,7 @@
 use anstyle::{AnsiColor, Style};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::io::{self, Write};
 
 use crate::error::{Error, Result};
@@ -17,6 +17,9 @@ pub struct Finding {
     pub severity: Severity,
     pub fingerprint: String,
     pub preview: String,
+    /// Set to `base64` when the secret was found inside a decoded token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<&'static str>,
 }
 
 #[derive(Debug, Default)]
@@ -73,9 +76,13 @@ impl Report {
                 Severity::Medium => ("MEDIUM", AnsiColor::Yellow.on_default()),
                 Severity::Low => ("LOW", AnsiColor::Blue.on_default()),
             };
+            let encoding = finding
+                .encoding
+                .map(|encoding| format!(" ({encoding})"))
+                .unwrap_or_default();
             writeln!(
                 out,
-                "{}:{}:{} [{colour}{label}{colour:#}] {} ({}) {dim}{}{dim:#}",
+                "{}:{}:{} [{colour}{label}{colour:#}] {} ({}) {dim}{}{dim:#}{encoding}",
                 finding.path,
                 finding.line,
                 finding.column,
@@ -91,6 +98,79 @@ impl Report {
     pub fn print_json(&self) -> Result<()> {
         let json = serde_json::to_string_pretty(&self.findings).map_err(Error::Json)?;
         writeln!(io::stdout(), "{}", json).map_err(write_error)
+    }
+}
+
+impl Report {
+    /// Prints the findings as a SARIF 2.1.0 log, for GitHub code scanning.
+    pub fn print_sarif(&self) -> Result<()> {
+        let json = serde_json::to_string_pretty(&self.sarif()).map_err(Error::Json)?;
+        writeln!(io::stdout(), "{}", json).map_err(write_error)
+    }
+
+    fn sarif(&self) -> serde_json::Value {
+        // One driver rule per rule id that occurs; `ruleIndex` points into this list.
+        let mut rules: BTreeMap<&str, &str> = BTreeMap::new();
+        for finding in &self.findings {
+            rules.insert(&finding.rule_id, &finding.rule_name);
+        }
+        let rule_ids: Vec<&str> = rules.keys().copied().collect();
+        let driver_rules: Vec<serde_json::Value> = rules
+            .iter()
+            .map(|(id, name)| {
+                serde_json::json!({
+                    "id": id,
+                    "name": name,
+                    "shortDescription": { "text": name },
+                })
+            })
+            .collect();
+        let results: Vec<serde_json::Value> = self
+            .findings
+            .iter()
+            .map(|finding| {
+                let level = match finding.severity {
+                    Severity::Critical | Severity::High => "error",
+                    Severity::Medium => "warning",
+                    Severity::Low => "note",
+                };
+                let rule_index = rule_ids
+                    .iter()
+                    .position(|id| *id == finding.rule_id)
+                    .unwrap_or_default();
+                serde_json::json!({
+                    "ruleId": finding.rule_id,
+                    "ruleIndex": rule_index,
+                    "level": level,
+                    "message": { "text": format!("{}: {}", finding.rule_name, finding.preview) },
+                    "locations": [{
+                        "physicalLocation": {
+                            "artifactLocation": { "uri": finding.path },
+                            "region": {
+                                "startLine": finding.line,
+                                "startColumn": finding.column,
+                            },
+                        },
+                    }],
+                    "partialFingerprints": { "nosecrets/v1": finding.fingerprint },
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {
+                    "driver": {
+                        "name": "nosecrets",
+                        "version": env!("CARGO_PKG_VERSION"),
+                        "informationUri": "https://casoon.github.io/nosecrets/",
+                        "rules": driver_rules,
+                    },
+                },
+                "results": results,
+            }],
+        })
     }
 }
 
@@ -201,6 +281,7 @@ mod tests {
             severity: Severity::High,
             fingerprint: "nsi_abcdef123456".to_string(),
             preview: "sec...ret".to_string(),
+            encoding: None,
         };
         let report = Report::new(vec![finding.clone(), finding]);
         assert_eq!(report.findings().len(), 1);
@@ -218,6 +299,7 @@ mod tests {
             severity: Severity::Low,
             fingerprint: format!("nsi_{path}{line}"),
             preview: String::new(),
+            encoding: None,
         };
         let report = Report::new(vec![finding("b", 1), finding("a", 9), finding("a", 2)]);
         let order: Vec<(&str, usize)> = report
@@ -226,5 +308,101 @@ mod tests {
             .map(|finding| (finding.path.as_str(), finding.line))
             .collect();
         assert_eq!(order, vec![("a", 2), ("a", 9), ("b", 1)]);
+    }
+
+    fn sarif_finding(rule_id: &str, severity: Severity, line: usize, secret: &str) -> Finding {
+        Finding {
+            path: "src/config.py".to_string(),
+            line,
+            column: 10,
+            rule_id: rule_id.to_string(),
+            rule_name: format!("Rule {rule_id}"),
+            severity,
+            fingerprint: fingerprint_secret(secret),
+            preview: mask_secret(secret),
+            encoding: None,
+        }
+    }
+
+    #[test]
+    fn sarif_maps_findings() {
+        // Split, so the repository's self-scan does not flag this test.
+        let secret = ["ghp_", "1234567890abcdefghijklmnopqrstuvwxyz"].concat();
+        let report = Report::new(vec![
+            sarif_finding("github-pat", Severity::Critical, 3, &secret),
+            sarif_finding("entropy", Severity::Low, 7, "xK9mB2vL5nQ8rT3wA7jP1hD6"),
+        ]);
+        let sarif = report.sarif();
+        assert_eq!(sarif["version"], "2.1.0");
+        let run = &sarif["runs"][0];
+        let driver = &run["tool"]["driver"];
+        assert_eq!(driver["name"], "nosecrets");
+        assert_eq!(driver["version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            driver["informationUri"],
+            "https://casoon.github.io/nosecrets/"
+        );
+        let rules = driver["rules"].as_array().expect("rules");
+        let ids: Vec<&str> = rules
+            .iter()
+            .map(|r| r["id"].as_str().expect("id"))
+            .collect();
+        assert_eq!(ids, vec!["entropy", "github-pat"]);
+        assert_eq!(rules[1]["name"], "Rule github-pat");
+        assert_eq!(rules[1]["shortDescription"]["text"], "Rule github-pat");
+
+        let results = run["results"].as_array().expect("results");
+        assert_eq!(results.len(), 2);
+        let first = &results[0];
+        assert_eq!(first["ruleId"], "github-pat");
+        assert_eq!(first["ruleIndex"], 1);
+        assert_eq!(first["level"], "error");
+        assert_eq!(first["message"]["text"], "Rule github-pat: ghp_...wxyz");
+        let location = &first["locations"][0]["physicalLocation"];
+        assert_eq!(location["artifactLocation"]["uri"], "src/config.py");
+        assert_eq!(location["region"]["startLine"], 3);
+        assert_eq!(location["region"]["startColumn"], 10);
+        assert_eq!(
+            first["partialFingerprints"]["nosecrets/v1"],
+            "nsi_1db61e13c133"
+        );
+        assert_eq!(results[1]["level"], "note");
+        assert_eq!(results[1]["ruleIndex"], 0);
+    }
+
+    #[test]
+    fn sarif_levels_follow_severity() {
+        let report = Report::new(vec![
+            sarif_finding("a", Severity::High, 1, "secret-a"),
+            sarif_finding("b", Severity::Medium, 2, "secret-b"),
+        ]);
+        let sarif = report.sarif();
+        assert_eq!(sarif["runs"][0]["results"][0]["level"], "error");
+        assert_eq!(sarif["runs"][0]["results"][1]["level"], "warning");
+    }
+
+    #[test]
+    fn sarif_empty_report_is_valid() {
+        let sarif = Report::new(Vec::new()).sarif();
+        assert_eq!(sarif["version"], "2.1.0");
+        assert_eq!(sarif["runs"][0]["results"], serde_json::json!([]));
+        assert_eq!(
+            sarif["runs"][0]["tool"]["driver"]["rules"],
+            serde_json::json!([])
+        );
+    }
+
+    #[test]
+    fn sarif_never_contains_the_secret() {
+        let secret = ["ghp_", "1234567890abcdefghijklmnopqrstuvwxyz"].concat();
+        let report = Report::new(vec![sarif_finding(
+            "github-pat",
+            Severity::Critical,
+            1,
+            &secret,
+        )]);
+        let text = serde_json::to_string(&report.sarif()).expect("json");
+        assert!(!text.contains(&secret));
+        assert!(!text.contains("1234567890abcdefghij"));
     }
 }

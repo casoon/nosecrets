@@ -81,6 +81,7 @@ struct IgnoreArgs {
 enum OutputFormat {
     Text,
     Json,
+    Sarif,
 }
 
 /// Exit code for a scan that could not be completed, as opposed to `1` for blocking findings.
@@ -136,6 +137,7 @@ fn run_scan(args: ScanArgs) -> Result<i32> {
     match args.format {
         OutputFormat::Text => report.print_terminal()?,
         OutputFormat::Json => report.print_json()?,
+        OutputFormat::Sarif => report.print_sarif()?,
     }
     let skipped = detector.skipped_large_files();
     if skipped > 0 {
@@ -150,6 +152,10 @@ fn build_detector(root: &Path, rule_files: &[PathBuf]) -> Result<Detector> {
         .as_ref()
         .map(|c| c.entropy.clone())
         .unwrap_or_default();
+    let decode_config = config
+        .as_ref()
+        .map(|c| c.decode.clone())
+        .unwrap_or_default();
     let ignore_entries = load_ignore_file(&root.join(".nosecretsignore"))?;
     let filter = Filter::from_config(config, ignore_entries)?;
     let mut rules = load_builtin_rules()?;
@@ -163,7 +169,7 @@ fn build_detector(root: &Path, rule_files: &[PathBuf]) -> Result<Detector> {
             .with_context(|| format!("failed to read rules from {}", path.display()))?;
         rules.extend(parse_rules(&content, &path.display().to_string())?);
     }
-    Ok(Detector::with_entropy(rules, filter, entropy_config)?)
+    Ok(Detector::with_entropy(rules, filter, entropy_config)?.with_decode(decode_config))
 }
 
 fn run_ignore(args: IgnoreArgs) -> Result<()> {

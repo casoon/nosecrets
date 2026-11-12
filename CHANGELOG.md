@@ -14,6 +14,7 @@ All notable changes to this project are documented in this file. The format foll
 - **README:** a recorded terminal scene and the same real examples.
 - **Entropy:** `[entropy] word_filter` (default `true`) skips candidates in which common English and programming words cover at least half of the characters, such as `getUserAuthenticationTokenFromRequest`. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
 - **Docs:** [Performance](https://casoon.github.io/nosecrets/docs/reference/performance/) lists measured timings for a commit, a tracked scan and a working-tree scan, with the machine they were taken on.
+- **Detection:** secrets stored base64-encoded (Kubernetes `Secret` values, `.env` values, CI variables) are found. Tokens of 24 or more base64 characters are decoded one level deep (standard and URL-safe alphabet) and matched against the rules; the finding sits at the encoded token and is marked `(base64)` in text and `"encoding": "base64"` in JSON. Disable with `[decode] base64 = false`. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
 - **Contributors:** `scripts/bench.sh` builds the release binary, generates a deterministic repository and measures the scans with hyperfine.
 
 ### Changed

@@ -170,11 +170,18 @@ values = [
   "AKIAIOSFODNN7EXAMPLE",
 ]
 
+[decode]
+base64 = true
+
 [scan]
 max_file_size = 5242880
 ```
 
 Files larger than `max_file_size` bytes (default 5 MiB) are skipped and counted in a note on stderr; `0` removes the limit. Unknown keys in `.nosecrets.toml` are an error, so a misspelled option cannot go unnoticed.
+
+### Base64-encoded secrets
+
+Secrets stored base64-encoded, such as the `data:` values of a Kubernetes `Secret`, are found too. nosecrets decodes runs of 24 or more base64 characters (standard or URL-safe alphabet, one level, up to 64 KiB decoded) when the result is valid UTF-8 and mostly printable text, and matches the decoded text against the rules. Entropy detection does not run on decoded text. A finding sits at the line and column of the encoded token, carries the rule ID of the inner rule and the fingerprint of the decoded secret (the same as for the plain secret), and is marked `(base64)` in text output and `"encoding": "base64"` in JSON. Inline ignores, allowlists and `.nosecretsignore` apply as usual. Turn it off with `[decode] base64 = false`.
 
 ### High-entropy detection
 

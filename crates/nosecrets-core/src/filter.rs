@@ -43,6 +43,28 @@ pub struct Config {
     pub entropy: EntropyConfig,
     #[serde(default)]
     pub scan: ScanConfig,
+    #[serde(default)]
+    pub decode: DecodeConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct DecodeConfig {
+    /// Decode base64 tokens and match the rules against the decoded text.
+    #[serde(default = "decode_default_base64")]
+    pub base64: bool,
+}
+
+impl Default for DecodeConfig {
+    fn default() -> Self {
+        Self {
+            base64: decode_default_base64(),
+        }
+    }
+}
+
+fn decode_default_base64() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize, Clone)]

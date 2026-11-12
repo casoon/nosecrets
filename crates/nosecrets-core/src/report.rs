@@ -17,6 +17,9 @@ pub struct Finding {
     pub severity: Severity,
     pub fingerprint: String,
     pub preview: String,
+    /// Set to `base64` when the secret was found inside a decoded token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<&'static str>,
 }
 
 #[derive(Debug, Default)]
@@ -73,9 +76,13 @@ impl Report {
                 Severity::Medium => ("MEDIUM", AnsiColor::Yellow.on_default()),
                 Severity::Low => ("LOW", AnsiColor::Blue.on_default()),
             };
+            let encoding = finding
+                .encoding
+                .map(|encoding| format!(" ({encoding})"))
+                .unwrap_or_default();
             writeln!(
                 out,
-                "{}:{}:{} [{colour}{label}{colour:#}] {} ({}) {dim}{}{dim:#}",
+                "{}:{}:{} [{colour}{label}{colour:#}] {} ({}) {dim}{}{dim:#}{encoding}",
                 finding.path,
                 finding.line,
                 finding.column,
@@ -201,6 +208,7 @@ mod tests {
             severity: Severity::High,
             fingerprint: "nsi_abcdef123456".to_string(),
             preview: "sec...ret".to_string(),
+            encoding: None,
         };
         let report = Report::new(vec![finding.clone(), finding]);
         assert_eq!(report.findings().len(), 1);
@@ -218,6 +226,7 @@ mod tests {
             severity: Severity::Low,
             fingerprint: format!("nsi_{path}{line}"),
             preview: String::new(),
+            encoding: None,
         };
         let report = Report::new(vec![finding("b", 1), finding("a", 9), finding("a", 2)]);
         let order: Vec<(&str, usize)> = report

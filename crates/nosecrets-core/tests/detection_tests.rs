@@ -4,7 +4,7 @@
 //! Note: Some tests (Stripe, Slack, Twilio) are omitted to avoid triggering
 //! GitHub's push protection, even with obviously fake tokens.
 
-use nosecrets_core::{load_builtin_rules, Detector, EntropyConfig, Filter};
+use nosecrets_core::{load_builtin_rules, DecodeConfig, Detector, EntropyConfig, Filter, Finding};
 use std::fs;
 use tempfile::tempdir;
 
@@ -866,4 +866,178 @@ fn checksum_rules_accept_valid_and_reject_altered_tokens() {
         !altered.contains(&"tk-token".to_string()),
         "got {altered:?}"
     );
+}
+
+// ============================================================================
+// Base64-encoded secrets
+// ============================================================================
+
+fn b64_encode(input: &[u8], alphabet: &[u8; 64], pad: bool) -> String {
+    let mut out = String::new();
+    for chunk in input.chunks(3) {
+        let acc = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |acc, (i, &b)| acc | u32::from(b) << (16 - 8 * i));
+        for i in 0..=chunk.len() {
+            out.push(alphabet[(acc >> (18 - 6 * i) & 63) as usize] as char);
+        }
+        if pad {
+            out.push_str(&"=".repeat(3 - chunk.len()));
+        }
+    }
+    out
+}
+
+const STANDARD: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const URL_SAFE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+fn b64(text: &str) -> String {
+    b64_encode(text.as_bytes(), STANDARD, true)
+}
+
+fn fake_github_token() -> String {
+    ["ghp", "_", "aB3dE5gH7jK9mN1pQ3sT5vX7zA9cD1fG3hJ5"].concat()
+}
+
+fn scan_findings(detector: &Detector, name: &str, content: &str) -> Vec<Finding> {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join(name);
+    fs::write(&path, content).expect("write");
+    detector.scan_files(dir.path(), &[path]).expect("scan")
+}
+
+#[test]
+fn detects_base64_github_token_in_kubernetes_secret() {
+    let detector = create_detector();
+    let manifest = format!(
+        "apiVersion: v1\nkind: Secret\nmetadata:\n  name: ci\ndata:\n  token: {}\n",
+        b64(&fake_github_token())
+    );
+    let findings = scan_findings(&detector, "secret.yaml", &manifest);
+    assert_eq!(findings.len(), 1, "got {findings:?}");
+    let finding = &findings[0];
+    assert_eq!(finding.rule_id, "github-pat");
+    assert_eq!((finding.line, finding.column), (6, 10));
+    assert_eq!(finding.encoding, Some("base64"));
+    // Same secret, same fingerprint as the plain finding.
+    let plain = scan_findings(
+        &detector,
+        "plain.env",
+        &format!("T={}\n", fake_github_token()),
+    );
+    assert_eq!(plain.len(), 1, "got {plain:?}");
+    assert_eq!(plain[0].fingerprint, finding.fingerprint);
+    assert_eq!(plain[0].encoding, None);
+}
+
+#[test]
+fn detects_base64_aws_key_pair_in_kubernetes_secret() {
+    let detector = create_detector();
+    let access = ["AKIA", "QWERTYUIOP23ASDF"].concat();
+    let secret = ["wJalrXUtnFEMI", "/K7MDENG/", "bPxRfiCYTESTKEY123"].concat();
+    let manifest = format!(
+        "data:\n  id: {}\n  key: {}\n",
+        b64(&access),
+        b64(&format!("AWS_SECRET_ACCESS_KEY = \"{secret}\""))
+    );
+    let findings = scan_findings(&detector, "aws.yaml", &manifest);
+    let find = |rule: &str| findings.iter().find(|f| f.rule_id == rule);
+    assert_eq!(
+        find("aws-access-key").map(|f| f.line),
+        Some(2),
+        "got {findings:?}"
+    );
+    assert_eq!(
+        find("aws-secret-key").map(|f| f.line),
+        Some(3),
+        "got {findings:?}"
+    );
+    assert!(findings.iter().all(|f| f.encoding == Some("base64")));
+}
+
+#[test]
+fn detects_url_safe_base64() {
+    let detector = create_detector();
+    // Pad the plain text so that the URL-safe alphabet really differs from the standard one.
+    let text = format!("??>>{}??>>", fake_github_token());
+    let encoded = b64_encode(text.as_bytes(), URL_SAFE, false);
+    assert!(encoded.contains('-') || encoded.contains('_'));
+    let findings = scan_findings(&detector, "ci.env", &format!("B64_TOKEN={encoded}\n"));
+    let ids: Vec<&str> = findings.iter().map(|f| f.rule_id.as_str()).collect();
+    assert_eq!(ids, ["github-pat"], "got {findings:?}");
+    assert_eq!(findings[0].encoding, Some("base64"));
+}
+
+#[test]
+fn ignores_base64_png_header_and_random_bytes() {
+    let detector = create_detector();
+    let png = b64_encode(
+        &[
+            0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, b'I', b'H', b'D', b'R',
+            0, 0, 1, 0, 0, 0, 1, 0, 8, 6,
+        ],
+        STANDARD,
+        true,
+    );
+    let mut state = 0x2545_f491_4f6c_dd1du64;
+    let random: Vec<u8> = (0..48)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 24) as u8
+        })
+        .collect();
+    let content = format!(
+        "icon: {png}\nblob: {}\n",
+        b64_encode(&random, STANDARD, true)
+    );
+    let findings = scan_findings(&detector, "data.yaml", &content);
+    assert!(findings.is_empty(), "got {findings:?}");
+}
+
+#[test]
+fn base64_decoding_can_be_disabled() {
+    let rules = load_builtin_rules().expect("rules");
+    let filter = Filter::from_config(None, Vec::new()).expect("filter");
+    let detector = Detector::new(rules, filter)
+        .expect("detector")
+        .with_decode(DecodeConfig { base64: false });
+    let content = format!("data:\n  token: {}\n", b64(&fake_github_token()));
+    let findings = scan_findings(&detector, "secret.yaml", &content);
+    assert!(findings.is_empty(), "got {findings:?}");
+}
+
+#[test]
+fn plain_secret_next_to_base64_text_is_reported_once() {
+    let detector = create_detector();
+    let content = format!(
+        "token: {}\nnote: {}\n",
+        fake_github_token(),
+        b64("just some harmless configuration text")
+    );
+    let findings = scan_findings(&detector, "mixed.yaml", &content);
+    assert_eq!(findings.len(), 1, "got {findings:?}");
+    assert_eq!(findings[0].encoding, None);
+    assert_eq!(findings[0].line, 1);
+}
+
+#[test]
+fn encoded_secret_behind_a_generic_name_is_reported_by_its_own_rule() {
+    let detector = create_detector();
+    let content = format!("api_key: \"{}\"\n", b64(&fake_github_token()));
+    let findings = scan_findings(&detector, "config.yaml", &content);
+    assert_eq!(findings.len(), 1, "got {findings:?}");
+    assert_eq!(findings[0].rule_id, "github-pat");
+    assert_eq!(findings[0].encoding, Some("base64"));
+    assert_eq!((findings[0].line, findings[0].column), (1, 11));
+}
+
+#[test]
+fn inline_ignore_applies_to_base64_findings() {
+    let detector = create_detector();
+    let content = format!("token: {} # @nosecrets-ignore\n", b64(&fake_github_token()));
+    let findings = scan_findings(&detector, "secret.yaml", &content);
+    assert!(findings.is_empty(), "got {findings:?}");
 }

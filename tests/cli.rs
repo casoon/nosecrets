@@ -85,6 +85,22 @@ fn json_output_is_valid_json() {
 }
 
 #[test]
+fn sarif_output_is_valid_and_never_prints_the_secret() {
+    let dir = dir_with_finding();
+    let output = nosecrets(dir.path(), &["scan", "--format", "sarif", "."]);
+    assert_eq!(output.status.code(), Some(EXIT_FINDINGS));
+    let sarif: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid json");
+    assert_eq!(sarif["version"], "2.1.0");
+    let result = &sarif["runs"][0]["results"][0];
+    assert_eq!(result["ruleId"], "github-pat");
+    assert_eq!(
+        result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+        "config.py"
+    );
+    assert!(!stdout(&output).contains(&fake_token()));
+}
+
+#[test]
 fn missing_path_is_an_error() {
     let dir = tempdir().expect("tempdir");
     let output = nosecrets(dir.path(), &["scan", "nope.txt"]);

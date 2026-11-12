@@ -23,6 +23,7 @@ repository. The tracked scan rejects an unmerged index instead of silently choos
 | `--dry-run` | Print findings but always exit with status 0 |
 | `--format text` | Human-readable terminal output; this is the default |
 | `--format json` | Machine-readable JSON array |
+| `--format sarif` | SARIF 2.1.0 log for GitHub code scanning |
 | `--rules <FILE>` | Load an additional TOML rule file; repeat to load more than one |
 
 Relative rule paths resolve from the repository root. Custom rules extend the built-in set.
@@ -60,6 +61,25 @@ Relative rule paths resolve from the repository root. Custom rules extend the bu
 Fields may be added in a release. Renaming or removing one, or changing its type, is listed
 under "Breaking" in the changelog. Notes such as skipped files go to standard error, so standard
 output stays valid JSON.
+
+## SARIF output
+
+`--format sarif` prints a SARIF 2.1.0 log on standard output, so findings can be uploaded to GitHub
+code scanning. Every finding becomes a result with the rule, the location and its `nsi_…`
+fingerprint (`partialFingerprints`, key `nosecrets/v1`); the secret itself is never included.
+`critical` and `high` map to the level `error`, `medium` to `warning`, `low` to `note`. Exit
+codes are the same as for the other formats.
+
+```yaml
+- run: nosecrets scan --tracked --dry-run --format sarif > nosecrets.sarif
+- uses: github/codeql-action/upload-sarif@v4
+  with:
+    sarif_file: nosecrets.sarif
+```
+
+`--dry-run` makes the scan exit with status 0 when it finds something, so the upload step runs and
+code scanning shows the alerts; a scan that cannot run still exits with status 2 and fails the
+job. To fail the job on findings as well, add a plain `nosecrets scan --tracked` step.
 
 ## Ignore command
 

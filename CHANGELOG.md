@@ -7,6 +7,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- **Output:** `--format sarif` prints a SARIF 2.1.0 log for GitHub code scanning. Details: [CLI reference](https://casoon.github.io/nosecrets/docs/reference/cli/).
 - **Releases:** statically linked musl binaries for Linux x64 and arm64 (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`), so nosecrets runs on Alpine and other musl-based CI containers. `install.sh` and the npm wrapper pick them automatically on musl systems.
 - **Rules:** AI provider keys (Anthropic, OpenAI, Hugging Face, Groq, xAI, OpenRouter, Replicate, Perplexity) and developer-tool tokens (1Password, Doppler, Docker Hub, Sentry, Linear, Notion, Postman, Databricks, Shopify, Telegram bot); 75 built-in rules in total.
 - **Rules:** the changed token formats of GitHub App installation tokens, Cloudflare (`cfk_`, `cfut_`, `cfat_`, `cfoat_`), Vercel, Supabase (`sb_secret_`, `sbp_`), GitLab (routable) and Slack (`xapp-`, `xoxe`) are detected. Where the vendor documents only the prefix, the rest of the token is matched loosely.
@@ -15,6 +16,7 @@ All notable changes to this project are documented in this file. The format foll
 - **README:** a recorded terminal scene and the same real examples.
 - **Entropy:** `[entropy] word_filter` (default `true`) skips candidates in which common English and programming words cover at least half of the characters, such as `getUserAuthenticationTokenFromRequest`. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
 - **Docs:** [Performance](https://casoon.github.io/nosecrets/docs/reference/performance/) lists measured timings for a commit, a tracked scan and a working-tree scan, with the machine they were taken on.
+- **Detection:** secrets stored base64-encoded (Kubernetes `Secret` values, `.env` values, CI variables) are found. Tokens of 24 or more base64 characters are decoded one level deep (standard and URL-safe alphabet) and matched against the rules; the finding sits at the encoded token and is marked `(base64)` in text and `"encoding": "base64"` in JSON. Disable with `[decode] base64 = false`. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
 - **Contributors:** `scripts/bench.sh` builds the release binary, generates a deterministic repository and measures the scans with hyperfine.
 
 ### Changed

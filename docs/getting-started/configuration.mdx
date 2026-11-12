@@ -28,6 +28,9 @@ word_filter = true
 [entropy.allow]
 patterns = ["^[a-f0-9]{32,}$"]
 
+[decode]
+base64 = true
+
 [scan]
 max_file_size = 5242880
 ```
@@ -39,6 +42,11 @@ candidates in which common English and programming words cover at least half of 
 `getUserAuthenticationTokenFromRequest` or `MAX_CONNECTION_RETRY_TIMEOUT`, are not reported.
 Interpolation like `${VAR}`, access like `os.environ["X"]` and generic types like
 `Promise<Foo<boolean>>` are skipped as well; a literal token next to them is still reported.
+
+With `decode.base64 = true` (default), runs of 24 or more base64 characters (standard or URL-safe
+alphabet) are decoded one level deep and the decoded text is matched against the rules, so a
+base64-encoded token in a Kubernetes `Secret` is found. Set it to `false` to scan only the text as
+written.
 
 Files larger than `scan.max_file_size` bytes (default 5 MiB) are skipped; nosecrets states on stderr
 how many. Set it to `0` to scan files of any size.

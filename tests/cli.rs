@@ -85,6 +85,22 @@ fn json_output_is_valid_json() {
 }
 
 #[test]
+fn sarif_output_is_valid_and_never_prints_the_secret() {
+    let dir = dir_with_finding();
+    let output = nosecrets(dir.path(), &["scan", "--format", "sarif", "."]);
+    assert_eq!(output.status.code(), Some(EXIT_FINDINGS));
+    let sarif: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid json");
+    assert_eq!(sarif["version"], "2.1.0");
+    let result = &sarif["runs"][0]["results"][0];
+    assert_eq!(result["ruleId"], "github-pat");
+    assert_eq!(
+        result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+        "config.py"
+    );
+    assert!(!stdout(&output).contains(&fake_token()));
+}
+
+#[test]
 fn missing_path_is_an_error() {
     let dir = tempdir().expect("tempdir");
     let output = nosecrets(dir.path(), &["scan", "nope.txt"]);
@@ -125,4 +141,69 @@ fn oversized_files_are_reported_on_stderr() {
     let output = nosecrets(dir.path(), &["scan", "config.py"]);
     assert_eq!(output.status.code(), Some(EXIT_OK));
     assert!(stderr(&output).contains("skipped 1 file(s)"));
+}
+
+fn base64_standard(input: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in input.chunks(3) {
+        let acc = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |acc, (i, &b)| acc | u32::from(b) << (16 - 8 * i));
+        for i in 0..=chunk.len() {
+            out.push(ALPHABET[(acc >> (18 - 6 * i) & 63) as usize] as char);
+        }
+        out.push_str(&"=".repeat(3 - chunk.len()));
+    }
+    out
+}
+
+fn dir_with_base64_finding() -> TempDir {
+    let dir = tempdir().expect("tempdir");
+    fs::write(
+        dir.path().join("secret.yaml"),
+        format!(
+            "data:\n  token: {}\n",
+            base64_standard(fake_token().as_bytes())
+        ),
+    )
+    .expect("write");
+    dir
+}
+
+#[test]
+fn base64_finding_is_marked_in_text_and_json_only_when_decoded() {
+    let dir = dir_with_base64_finding();
+    let text = nosecrets(dir.path(), &["scan", "."]);
+    assert_eq!(text.status.code(), Some(EXIT_FINDINGS));
+    assert!(
+        stdout(&text).contains("secret.yaml:2:10"),
+        "{}",
+        stdout(&text)
+    );
+    assert!(stdout(&text)
+        .trim_end()
+        .lines()
+        .next()
+        .unwrap()
+        .ends_with("(base64)"));
+    let json = nosecrets(dir.path(), &["scan", "--format", "json", "."]);
+    assert!(stdout(&json).contains("\"encoding\": \"base64\""));
+
+    let plain = dir_with_finding();
+    let json = nosecrets(plain.path(), &["scan", "--format", "json", "."]);
+    assert!(!stdout(&json).contains("encoding"));
+}
+
+#[test]
+fn decode_section_can_disable_base64() {
+    let dir = dir_with_base64_finding();
+    fs::write(
+        dir.path().join(".nosecrets.toml"),
+        "[decode]\nbase64 = false\n",
+    )
+    .expect("write");
+    let output = nosecrets(dir.path(), &["scan", "."]);
+    assert_eq!(output.status.code(), Some(EXIT_OK), "{}", stdout(&output));
 }

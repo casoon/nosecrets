@@ -31,6 +31,11 @@ Every file passes the same pipeline (`scan_content` in `crates/nosecrets-core/sr
   Aho-Corasick keyword prefilter selects the rules worth running, the rule's regular expression
   finds candidates, and structural validation (charset, length, prefix) drops values that cannot be
   the real format.
+- **Encoded secrets.** Runs of 24 or more base64 characters (standard or URL-safe alphabet) are
+  decoded one level deep. If the result is valid UTF-8 and mostly printable text, the same rules run
+  over it; the entropy detector does not. The finding sits at the encoded token, carries the rule ID
+  of the inner rule and the fingerprint of the decoded secret, and is marked `(base64)` in text
+  output and `"encoding": "base64"` in JSON. Turn it off with `[decode] base64 = false`.
 - **Unknown tokens.** The entropy detector looks for long, high-entropy strings near names such as
   `secret`, `token`, `key`, `auth` or `password`. Placeholders like `example` or `changeme` are never
   flagged, and spans already reported by a rule are not reported twice. Entropy findings use the

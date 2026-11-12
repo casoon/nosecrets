@@ -255,11 +255,17 @@ fn hook_warns_and_allows_outside_a_repository() {
     assert!(stderr(&output).contains("warning"));
 }
 
+/// A path as it appears in a shell command: the hook reads the command like Bash does, where a
+/// backslash is an escape character, so Windows paths are written with forward slashes.
+fn shell_path(path: &Path) -> String {
+    path.display().to_string().replace('\\', "/")
+}
+
 #[test]
 fn hook_follows_git_dash_c() {
     let repo = staged_token_repo();
     let elsewhere = tempdir().expect("tempdir");
-    let command = format!("git -C {} commit -m x", repo.path().display());
+    let command = format!("git -C {} commit -m x", shell_path(repo.path()));
     let output = hook(elsewhere.path(), &bash_input(elsewhere.path(), &command));
     assert_blocked(&output);
 }
@@ -268,7 +274,7 @@ fn hook_follows_git_dash_c() {
 fn hook_follows_cd_in_a_chain() {
     let repo = staged_token_repo();
     let other = tempdir().expect("tempdir");
-    let command = format!("cd {} && git commit -m x", repo.path().display());
+    let command = format!("cd {} && git commit -m x", shell_path(repo.path()));
     let output = hook(other.path(), &bash_input(other.path(), &command));
     assert_blocked(&output);
 }

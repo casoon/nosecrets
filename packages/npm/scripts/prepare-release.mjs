@@ -36,6 +36,18 @@ const targets = [
     executable: true,
   },
   {
+    asset: 'nosecrets-aarch64-unknown-linux-musl.tar.gz',
+    vendorDir: 'npm-linux-arm64-musl',
+    binaryName: 'nosecrets',
+    executable: true,
+  },
+  {
+    asset: 'nosecrets-x86_64-unknown-linux-musl.tar.gz',
+    vendorDir: 'npm-linux-x64-musl',
+    binaryName: 'nosecrets',
+    executable: true,
+  },
+  {
     asset: 'nosecrets-x86_64-pc-windows-msvc.zip',
     vendorDir: 'npm-win32-x64',
     binaryName: 'nosecrets.exe',

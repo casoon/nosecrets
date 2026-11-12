@@ -89,7 +89,7 @@ deploy.sh:2:24 [HIGH] Acme service token (acme-service-token) nsi_a7570523585c
 curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh
 ```
 
-Installs the prebuilt binary to `/usr/local/bin`. Override the target directory:
+Installs the prebuilt binary to `/usr/local/bin`. Prebuilt targets: macOS arm64, Linux x64 and arm64 (glibc and statically linked musl, for example Alpine; the installer picks the matching one), Windows x64. Override the target directory:
 
 ```sh
 NOSECRETS_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/casoon/nosecrets/main/install.sh | sh

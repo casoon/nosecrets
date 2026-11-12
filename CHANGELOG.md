@@ -7,6 +7,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- **Releases:** statically linked musl binaries for Linux x64 and arm64 (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`), so nosecrets runs on Alpine and other musl-based CI containers. `install.sh` and the npm wrapper pick them automatically on musl systems.
 - **Rules:** AI provider keys (Anthropic, OpenAI, Hugging Face, Groq, xAI, OpenRouter, Replicate, Perplexity) and developer-tool tokens (1Password, Doppler, Docker Hub, Sentry, Linear, Notion, Postman, Databricks, Shopify, Telegram bot); 75 built-in rules in total.
 - **Rules:** the changed token formats of GitHub App installation tokens, Cloudflare (`cfk_`, `cfut_`, `cfat_`, `cfoat_`), Vercel, Supabase (`sb_secret_`, `sbp_`), GitLab (routable) and Slack (`xapp-`, `xoxe`) are detected. Where the vendor documents only the prefix, the rest of the token is matched loosely.
 - **Rules:** `validate.checksum = "crc32-base62-suffix6"` for custom rules. Details: [Custom rules](https://casoon.github.io/nosecrets/docs/reference/custom-rules/).

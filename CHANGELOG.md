@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-12
+
+### Added
+
+- **Releases:** statically linked musl binaries for Linux x64 and arm64 (`x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`), so nosecrets runs on Alpine and other musl-based CI containers. `install.sh` and the npm wrapper pick them automatically on musl systems.
+
 ## [0.5.0] - 2026-11-12
 
 ### Added

@@ -19,9 +19,16 @@ case "$OS" in
     EXT="tar.gz"
     ;;
   Linux)
+    # musl (e.g. Alpine): `ldd --version` prints to stderr and exits non-zero there.
+    # `|| true` keeps `set -e` from aborting when ldd is missing or exits non-zero.
+    if { ldd --version 2>&1 || true; } | grep -qi musl; then
+      LIBC="musl"
+    else
+      LIBC="gnu"
+    fi
     case "$ARCH" in
-      aarch64) TARGET="aarch64-unknown-linux-gnu" ;;
-      x86_64)  TARGET="x86_64-unknown-linux-gnu" ;;
+      aarch64) TARGET="aarch64-unknown-linux-${LIBC}" ;;
+      x86_64)  TARGET="x86_64-unknown-linux-${LIBC}" ;;
       *)       echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
     esac
     EXT="tar.gz"

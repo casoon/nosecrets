@@ -31,7 +31,7 @@ nosecrets scan --staged --interactive
 - Offline only — no API calls, no data leaves your machine
 - Configurable via `.nosecrets.toml`
 
-The package ships prebuilt binaries for Apple Silicon macOS, Linux (x64/arm64), and Windows (x64).
+The package ships prebuilt binaries for Apple Silicon macOS, Linux (x64/arm64, glibc and musl), and Windows (x64).
 Intel macOS users can install from crates.io with `cargo install nosecrets-cli`.
 
 Full documentation: <https://casoon.github.io/nosecrets/>

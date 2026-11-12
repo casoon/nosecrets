@@ -111,6 +111,17 @@ jobs:
             os: ubuntu-latest
             asset-name: nosecrets-aarch64-unknown-linux-gnu.tar.gz
             binary-name: nosecrets
+            cross: true
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            asset-name: nosecrets-x86_64-unknown-linux-musl.tar.gz
+            binary-name: nosecrets
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            asset-name: nosecrets-aarch64-unknown-linux-musl.tar.gz
+            binary-name: nosecrets
+            cross: true
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             asset-name: nosecrets-x86_64-pc-windows-msvc.zip
@@ -129,13 +140,13 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Install cross
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        if: matrix.cross
         run: cargo install cross
 
       - name: Build
         shell: bash
         run: |
-          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+          if [ "${{ matrix.cross }}" = "true" ]; then
             cross build --release --target ${{ matrix.target }}
           else
             cargo build --release --target ${{ matrix.target }}

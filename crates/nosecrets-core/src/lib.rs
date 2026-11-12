@@ -12,8 +12,8 @@ mod rules;
 pub use detector::{collect_files, Detector};
 pub use error::{Error, Result};
 pub use filter::{
-    load_ignore_file, normalize_path, AllowConfig, Config, EntropyAllowConfig, EntropyConfig,
-    Filter, IgnoreConfig, IgnoreEntry, ScanConfig,
+    load_ignore_file, normalize_path, AllowConfig, Config, DecodeConfig, EntropyAllowConfig,
+    EntropyConfig, Filter, IgnoreConfig, IgnoreEntry, ScanConfig,
 };
 pub use git::discover_repo_root;
 pub use report::{fingerprint_secret, mask_secret, Finding, Report};

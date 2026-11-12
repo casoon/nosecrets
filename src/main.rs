@@ -96,6 +96,10 @@ fn run_scan(args: ScanArgs) -> Result<i32> {
         .as_ref()
         .map(|c| c.entropy.clone())
         .unwrap_or_default();
+    let decode_config = config
+        .as_ref()
+        .map(|c| c.decode.clone())
+        .unwrap_or_default();
     let ignore_entries = load_ignore_file(&root.join(".nosecretsignore"))?;
     let filter = Filter::from_config(config, ignore_entries)?;
     let mut rules = load_builtin_rules()?;
@@ -109,7 +113,8 @@ fn run_scan(args: ScanArgs) -> Result<i32> {
             .with_context(|| format!("failed to read rules from {}", path.display()))?;
         rules.extend(parse_rules(&content, &path.display().to_string())?);
     }
-    let detector = Detector::with_entropy(rules, filter, entropy_config)?;
+    let detector =
+        Detector::with_entropy(rules, filter, entropy_config)?.with_decode(decode_config);
 
     let findings = if args.staged || args.tracked {
         let Some(repo_root) = repo_root else {

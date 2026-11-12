@@ -11,7 +11,7 @@ use regex::Regex;
 
 use crate::entropy;
 use crate::error::{Error, Result};
-use crate::filter::{build_globset, normalize_path, EntropyConfig, Filter};
+use crate::filter::{build_globset, normalize_path, DecodeConfig, EntropyConfig, Filter};
 use crate::git::{list_staged_blobs, list_tracked_blobs, load_git_blob_contents, GitBlob};
 use crate::report::{fingerprint_secret, mask_secret, Finding};
 use crate::rules::{Rule, RuleAllow, RulePaths, RuleValidate, Severity};
@@ -22,6 +22,7 @@ pub struct Detector {
     filter: Arc<Filter>,
     entropy_config: EntropyConfig,
     entropy_allow_patterns: Vec<Regex>,
+    decode: DecodeConfig,
     skipped_large_files: AtomicUsize,
 }
 
@@ -102,8 +103,15 @@ impl Detector {
             filter: Arc::new(filter),
             entropy_config,
             entropy_allow_patterns: entropy_allow,
+            decode: DecodeConfig::default(),
             skipped_large_files: AtomicUsize::new(0),
         })
+    }
+
+    /// Sets which encodings are decoded and scanned (default: base64 on).
+    pub fn with_decode(mut self, decode: DecodeConfig) -> Self {
+        self.decode = decode;
+        self
     }
 
     /// Number of files skipped so far because they exceed the configured size limit.
@@ -182,52 +190,49 @@ impl Detector {
 
         // Phase 1: Regex-based detection
         let candidate_rules = self.prefilter.candidates(&text);
-        for &rule_idx in &candidate_rules {
-            let rule = &self.rules[rule_idx];
-            if !rule.applies_to_path(rel_path) {
+        for (rule_idx, start, end, secret) in self.rule_matches(&text, rel_path, &candidate_rules) {
+            let (line, column) = line_col(&line_starts, start);
+            let line_text = line_slice(&text, &line_starts, line);
+            if Filter::is_inline_ignored(line_text) {
                 continue;
             }
-            for caps in rule.regex.captures_iter(&text) {
-                let Some(matched) = caps.get(rule.rule.capture) else {
-                    continue;
-                };
-                let secret = matched.as_str();
-                if !validate_secret(&rule.rule.validate, rule.charset_regex.as_ref(), secret) {
-                    continue;
-                }
-                if rule.is_allowed(secret) || self.filter.is_value_allowed(secret) {
-                    continue;
-                }
-                let (line, column) = line_col(&line_starts, matched.start());
-                let line_text = line_slice(&text, &line_starts, line);
-                if Filter::is_inline_ignored(line_text) {
-                    continue;
-                }
-                let fingerprint = fingerprint_secret(secret);
-                if self.filter.is_fingerprint_ignored(&fingerprint, rel_path) {
-                    continue;
-                }
-                hits.push(RegexHit {
-                    start: matched.start(),
-                    end: matched.end(),
-                    rule_idx,
-                    finding: Finding {
-                        path: normalize_path(rel_path),
-                        line,
-                        column,
-                        rule_id: rule.rule.id.clone(),
-                        rule_name: rule.rule.name.clone(),
-                        severity: rule.rule.severity,
-                        fingerprint,
-                        preview: mask_secret(secret),
-                    },
-                });
+            let fingerprint = fingerprint_secret(secret);
+            if self.filter.is_fingerprint_ignored(&fingerprint, rel_path) {
+                continue;
             }
+            let rule = &self.rules[rule_idx];
+            hits.push(RegexHit {
+                start,
+                end,
+                rule_idx,
+                finding: Finding {
+                    path: normalize_path(rel_path),
+                    line,
+                    column,
+                    rule_id: rule.rule.id.clone(),
+                    rule_name: rule.rule.name.clone(),
+                    severity: rule.rule.severity,
+                    fingerprint,
+                    preview: mask_secret(secret),
+                    encoding: None,
+                },
+            });
         }
         let hits = self.best_hit_per_span(hits);
-        let regex_spans: Vec<(usize, usize)> =
+        let mut regex_spans: Vec<(usize, usize)> =
             hits.iter().map(|hit| (hit.start, hit.end)).collect();
         let mut findings: Vec<Finding> = hits.into_iter().map(|hit| hit.finding).collect();
+
+        // Phase 1b: regex rules over base64-decoded tokens (one level, no entropy)
+        if self.decode.base64 {
+            self.scan_base64(
+                &text,
+                &line_starts,
+                rel_path,
+                &mut regex_spans,
+                &mut findings,
+            );
+        }
 
         // Phase 2: Entropy-based detection
         if self.entropy_config.enabled {
@@ -263,11 +268,129 @@ impl Detector {
                     severity: Severity::Medium,
                     fingerprint,
                     preview: mask_secret(&em.text),
+                    encoding: None,
                 });
             }
         }
 
         Ok(findings)
+    }
+
+    /// Runs the candidate rules over `text` and returns every match that passes path filter,
+    /// validation and allowlists, as `(rule index, start, end, secret)`.
+    fn rule_matches<'t>(
+        &self,
+        text: &'t str,
+        rel_path: &Path,
+        candidate_rules: &[usize],
+    ) -> Vec<(usize, usize, usize, &'t str)> {
+        let mut matches = Vec::new();
+        for &rule_idx in candidate_rules {
+            let rule = &self.rules[rule_idx];
+            if !rule.applies_to_path(rel_path) {
+                continue;
+            }
+            for caps in rule.regex.captures_iter(text) {
+                let Some(matched) = caps.get(rule.rule.capture) else {
+                    continue;
+                };
+                let secret = matched.as_str();
+                if !validate_secret(&rule.rule.validate, rule.charset_regex.as_ref(), secret) {
+                    continue;
+                }
+                if rule.is_allowed(secret) || self.filter.is_value_allowed(secret) {
+                    continue;
+                }
+                matches.push((rule_idx, matched.start(), matched.end(), secret));
+            }
+        }
+        matches
+    }
+
+    /// Decodes base64 candidates and matches the regex rules against the decoded text.
+    /// Findings sit at the encoded token; its span is added to `spans` so the entropy layer
+    /// skips it. Tokens overlapping a plain finding are skipped.
+    fn scan_base64(
+        &self,
+        text: &str,
+        line_starts: &[usize],
+        rel_path: &Path,
+        spans: &mut Vec<(usize, usize)>,
+        findings: &mut Vec<Finding>,
+    ) {
+        let plain_len = spans.len();
+        // A plain finding from a catch-all rule on an encoded token (`api_key: <base64>`) is
+        // replaced by what the decoded text reveals; a specific plain finding wins.
+        let is_generic = |rule_id: &str| {
+            self.rules
+                .iter()
+                .any(|compiled| compiled.rule.id == rule_id && compiled.rule.generic)
+        };
+        let mut replaced: Vec<usize> = Vec::new();
+        for (start, end) in base64_candidates(text.as_bytes()) {
+            let overlapping: Vec<usize> = (0..plain_len)
+                .filter(|&i| start < spans[i].1 && end > spans[i].0)
+                .collect();
+            if overlapping
+                .iter()
+                .any(|&i| !is_generic(&findings[i].rule_id))
+            {
+                continue;
+            }
+            let Some(decoded) = decode_base64(&text.as_bytes()[start..end]) else {
+                continue;
+            };
+            let candidate_rules = self.prefilter.candidates(&decoded);
+            let mut hits: Vec<RegexHit> = self
+                .rule_matches(&decoded, rel_path, &candidate_rules)
+                .into_iter()
+                .map(|(rule_idx, s, e, secret)| RegexHit {
+                    start: s,
+                    end: e,
+                    rule_idx,
+                    finding: Finding {
+                        path: normalize_path(rel_path),
+                        line: 0,
+                        column: 0,
+                        rule_id: self.rules[rule_idx].rule.id.clone(),
+                        rule_name: self.rules[rule_idx].rule.name.clone(),
+                        severity: self.rules[rule_idx].rule.severity,
+                        fingerprint: fingerprint_secret(secret),
+                        preview: mask_secret(secret),
+                        encoding: Some("base64"),
+                    },
+                })
+                .collect();
+            if hits.is_empty() {
+                continue;
+            }
+            let (line, column) = line_col(line_starts, start);
+            if Filter::is_inline_ignored(line_slice(text, line_starts, line)) {
+                continue;
+            }
+            hits = self.best_hit_per_span(hits);
+            for mut hit in hits {
+                if self
+                    .filter
+                    .is_fingerprint_ignored(&hit.finding.fingerprint, rel_path)
+                {
+                    continue;
+                }
+                hit.finding.line = line;
+                hit.finding.column = column;
+                findings.push(hit.finding);
+                spans.push((start, end));
+                replaced.extend(&overlapping);
+            }
+        }
+        if !replaced.is_empty() {
+            let mut index = 0;
+            findings.retain(|_| {
+                let keep = !replaced.contains(&index);
+                index += 1;
+                keep
+            });
+        }
     }
 
     /// Keeps one hit per overlapping span: the more severe rule wins, then a specific rule
@@ -509,6 +632,86 @@ fn walk_inputs(
     }
 
     Ok(files)
+}
+
+/// Longest base64 token whose decoded form is still scanned (decoded size cap of 64 KiB).
+const MAX_BASE64_LEN: usize = 64 * 1024 / 3 * 4;
+
+fn is_base64_char(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'_' | b'-')
+}
+
+/// Finds runs of at least 24 base64 characters, including up to two trailing `=`.
+fn base64_candidates(bytes: &[u8]) -> Vec<(usize, usize)> {
+    let mut candidates = Vec::new();
+    let mut idx = 0;
+    while idx < bytes.len() {
+        if !is_base64_char(bytes[idx]) {
+            idx += 1;
+            continue;
+        }
+        let start = idx;
+        while idx < bytes.len() && is_base64_char(bytes[idx]) {
+            idx += 1;
+        }
+        if idx - start < 24 {
+            continue;
+        }
+        let mut end = idx;
+        while end < bytes.len() && end - idx < 2 && bytes[end] == b'=' {
+            end += 1;
+        }
+        idx = end;
+        if end - start <= MAX_BASE64_LEN {
+            candidates.push((start, end));
+        }
+    }
+    candidates
+}
+
+fn base64_value(byte: u8) -> u8 {
+    match byte {
+        b'A'..=b'Z' => byte - b'A',
+        b'a'..=b'z' => byte - b'a' + 26,
+        b'0'..=b'9' => byte - b'0' + 52,
+        b'+' | b'-' => 62,
+        _ => 63,
+    }
+}
+
+/// Decodes a standard or URL-safe base64 token. Returns the text only if it is valid UTF-8
+/// and at least 90 % printable ASCII; mixed alphabets and bad lengths yield `None`.
+fn decode_base64(token: &[u8]) -> Option<String> {
+    let body_len = token.iter().take_while(|&&byte| byte != b'=').count();
+    let (body, padding) = token.split_at(body_len);
+    if body.len() % 4 == 1 || (!padding.is_empty() && (body.len() + padding.len()) % 4 != 0) {
+        return None;
+    }
+    let standard = body.iter().any(|&byte| matches!(byte, b'+' | b'/'));
+    let url_safe = body.iter().any(|&byte| matches!(byte, b'-' | b'_'));
+    if standard && url_safe {
+        return None;
+    }
+    let max_bad = body.len() * 3 / 4 / 10;
+    let mut bad = 0;
+    let mut out = Vec::with_capacity(body.len() * 3 / 4);
+    for chunk in body.chunks(4) {
+        let mut acc = 0u32;
+        for &byte in chunk {
+            acc = acc << 6 | u32::from(base64_value(byte));
+        }
+        acc <<= 6 * (4 - chunk.len());
+        for &byte in &acc.to_be_bytes()[1..chunk.len()] {
+            if !(byte == b'\n' || byte == b'\r' || byte == b'\t' || (0x20..0x7f).contains(&byte)) {
+                bad += 1;
+                if bad > max_bad {
+                    return None;
+                }
+            }
+            out.push(byte);
+        }
+    }
+    String::from_utf8(out).ok()
 }
 
 fn build_line_starts(text: &str) -> Vec<usize> {

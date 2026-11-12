@@ -65,6 +65,7 @@ struct IgnoreArgs {
 enum OutputFormat {
     Text,
     Json,
+    Sarif,
 }
 
 /// Exit code for a scan that could not be completed, as opposed to `1` for blocking findings.
@@ -135,6 +136,7 @@ fn run_scan(args: ScanArgs) -> Result<i32> {
     match args.format {
         OutputFormat::Text => report.print_terminal()?,
         OutputFormat::Json => report.print_json()?,
+        OutputFormat::Sarif => report.print_sarif()?,
     }
     let skipped = detector.skipped_large_files();
     if skipped > 0 {

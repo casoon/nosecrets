@@ -5,6 +5,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-12
+
 ### Added
 
 - **Output:** `--format sarif` prints a SARIF 2.1.0 log for GitHub code scanning. Details: [CLI reference](https://casoon.github.io/nosecrets/docs/reference/cli/).

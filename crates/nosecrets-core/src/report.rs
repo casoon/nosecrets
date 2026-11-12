@@ -320,6 +320,7 @@ mod tests {
             severity,
             fingerprint: fingerprint_secret(secret),
             preview: mask_secret(secret),
+            encoding: None,
         }
     }
 

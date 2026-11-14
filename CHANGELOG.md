@@ -5,6 +5,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-14
+
 ### Added
 
 - **Rules:** `allow.match_patterns` for custom rules tests the whole match instead of the captured value. Details: [Custom rules](https://casoon.github.io/nosecrets/docs/reference/custom-rules/).

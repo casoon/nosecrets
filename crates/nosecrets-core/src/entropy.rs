@@ -76,6 +76,32 @@ const PLACEHOLDER_PATTERNS: &[&str] = &[
     "mock",
 ];
 
+/// File names whose content is minified, generated or prose by nature. The entropy layer skips
+/// them; the provider-specific rules still run, so a real token in a bundle is found.
+pub fn skips_path(path: &std::path::Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let name = name.to_ascii_lowercase();
+    const SUFFIXES: &[&str] = &[".min.js", ".min.css", ".map"];
+    const PREFIXES: &[&str] = &["license", "licence", "copying", "notice", "changelog"];
+    SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
+        || PREFIXES.iter().any(|prefix| {
+            name.strip_prefix(prefix)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with(['.', '-', '_']))
+        })
+        || name.contains("third-party-licenses")
+}
+
+/// Start of values that are already encrypted: SOPS, Jasypt, Ansible Vault and age.
+const ENCRYPTED_PREFIXES: &[&str] = &[
+    "ENC[",
+    "ENC(",
+    "$ANSIBLE_VAULT;",
+    "-----BEGIN AGE ENCRYPTED FILE-----",
+    "age-encryption.org/v1",
+];
+
 /// Run entropy-based detection on file content.
 /// Returns matches that passed all guards.
 pub fn detect_entropy(
@@ -241,6 +267,14 @@ fn add_subtokens(
     candidates: &mut Vec<EntropyCandidate>,
     seen: &mut std::collections::HashSet<usize>,
 ) {
+    // A value that is already encrypted is not a secret, nor are the parts of its envelope.
+    if ENCRYPTED_PREFIXES
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+    {
+        return;
+    }
+
     // First, add the whole value if it qualifies. Skip whitespace-containing values
     // because prose, Markdown, and config descriptions are too noisy for entropy.
     if value.len() >= min_length
@@ -885,5 +919,52 @@ URL="https://example.com/api/v1"
     fn test_word_filter_keeps_synthetic_token() {
         assert!(!is_mostly_dictionary_words(SYNTHETIC));
         assert!(flagged(&format!("SECRET_TOKEN=\"{SYNTHETIC}\"")));
+    }
+
+    #[test]
+    fn test_skips_encrypted_envelopes() {
+        assert!(!flagged(
+            r#"api_key = "ENC[AES256_GCM,data:Zx9Qm2LpV7nR4tYb8KdW3sJc6HgF5aEu,iv:aB3dE5gH7jK9mN1pQ3sT5vX7zA9cE1gI3kM5oQ7sU9w=,tag:Zx9Qm2LpV7nR4tYb8KdW3s==,type:str]""#
+        ));
+        assert!(!flagged(
+            r#"password: "$ANSIBLE_VAULT;1.1;AES256Zx9Qm2LpV7nR4tYb8KdW3sJc6HgF5aEu""# // @nsi synthetic test value
+        ));
+        assert!(!flagged(
+            r#"token = "ENC(Zx9Qm2LpV7nR4tYb8KdW3sJc6HgF5aEu)""#
+        ));
+    }
+
+    #[test]
+    fn test_encrypted_guard_needs_the_marker_at_the_start() {
+        assert!(flagged(
+            r#"api_key = "Zx9Qm2LpV7nR4tYbENC[8KdW3sJc6HgF5aEu""# // @nsi synthetic test value
+        ));
+    }
+
+    #[test]
+    fn test_skips_path_by_file_name() {
+        use std::path::Path;
+        for name in [
+            "a/b/app.min.js",
+            "x.min.css",
+            "bundle.js.map",
+            "LICENSE",
+            "licence.txt",
+            "COPYING",
+            "NOTICE.md",
+            "CHANGELOG-v4.md",
+            "ui/public/third-party-licenses.json",
+        ] {
+            assert!(skips_path(Path::new(name)), "{name}");
+        }
+        for name in [
+            "app.js",
+            "style.css",
+            "licensed.rs",
+            "secrets.json",
+            "map.rs",
+        ] {
+            assert!(!skips_path(Path::new(name)), "{name}");
+        }
     }
 }

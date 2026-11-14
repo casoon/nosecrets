@@ -5,8 +5,15 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Rules:** `allow.match_patterns` for custom rules tests the whole match instead of the captured value. Details: [Custom rules](https://casoon.github.io/nosecrets/docs/reference/custom-rules/).
+- **Entropy:** values that start with an encryption envelope (SOPS `ENC[`, Jasypt `ENC(`, Ansible Vault, age) are not reported. Details: [Configuration](https://casoon.github.io/nosecrets/docs/getting-started/configuration/).
+
 ### Changed
 
+- **Entropy:** minified and generated files (`*.min.js`, `*.min.css`, `*.map`) and license, notice and changelog files are skipped by the high-entropy detector; the provider rules still run on them.
+- **Rules:** the connection URI rules no longer report a URI with a loopback or `example` host or a placeholder password in capitals or brackets such as `PASSWORD` or `<password>`.
 - **Pages:** the project site uses the current shared theme (0.12.14).
 
 

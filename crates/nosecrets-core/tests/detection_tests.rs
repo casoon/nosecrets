@@ -120,7 +120,7 @@ fn detects_npm_token() {
 #[test]
 fn detects_postgres_url() {
     let detector = create_detector();
-    let content = r#"DATABASE_URL = "postgresql://user:p4ssw0rd@localhost:5432/mydb""#;
+    let content = r#"DATABASE_URL = "postgresql://user:p4ssw0rd@db.internal.acme.io:5432/mydb""#;
     let rule_ids = scan_content(&detector, content);
     assert!(
         rule_ids.contains(&"postgres-connection-uri".to_string()),
@@ -132,13 +132,81 @@ fn detects_postgres_url() {
 #[test]
 fn detects_mysql_url() {
     let detector = create_detector();
-    let content = r#"DATABASE_URL = "mysql://admin:secretpass123@db.example.com/production""#;
+    let content = r#"DATABASE_URL = "mysql://admin:secretpass123@db.acme.io/production""#;
     let rule_ids = scan_content(&detector, content);
     assert!(
         rule_ids.contains(&"mysql-connection-uri".to_string()),
         "expected mysql-connection-uri, got {:?}",
         rule_ids
     );
+}
+
+#[test]
+fn connection_uri_to_local_or_example_host_is_not_reported() {
+    let detector = create_detector();
+    for content in [
+        r#"DATABASE_URL = "postgresql://user:p4ssw0rd@localhost:5432/mydb""#,
+        r#"MONGO_URL = "mongodb://root:s3cr3tvalue@127.0.0.1:27017/app""#,
+        r#"MYSQL_URL = "mysql://admin:secretpass123@db.example.com/production""#,
+        r#"REDIS_URL = "redis://:s3cr3tvalue@host.docker.internal:6379""#,
+    ] {
+        let rule_ids = scan_content(&detector, content);
+        assert!(rule_ids.is_empty(), "{content}: got {rule_ids:?}");
+    }
+}
+
+#[test]
+fn connection_uri_with_placeholder_password_is_not_reported() {
+    let detector = create_detector();
+    for content in [
+        r#"REDIS_URL="redis://:PASSWORD@cache.acme.io:6379""#,
+        r#"DATABASE_URL = "postgres://app:<password>@db.acme.io/app""#,
+        r#"DATABASE_URL = "postgres://app:xxxxxx@db.acme.io/app""#,
+    ] {
+        let rule_ids = scan_content(&detector, content);
+        assert!(rule_ids.is_empty(), "{content}: got {rule_ids:?}");
+    }
+}
+
+#[test]
+fn connection_uri_host_that_only_starts_with_localhost_is_reported() {
+    let detector = create_detector();
+    let content = r#"DATABASE_URL = "postgresql://user:p4ssw0rd@localhost.acme.io:5432/mydb""#;
+    let rule_ids = scan_content(&detector, content);
+    assert!(
+        rule_ids.contains(&"postgres-connection-uri".to_string()),
+        "got {rule_ids:?}"
+    );
+}
+
+fn scan_named(detector: &Detector, name: &str, content: &str) -> Vec<String> {
+    let dir = tempdir().expect("tempdir");
+    let path = dir.path().join(name);
+    fs::write(&path, content).expect("write");
+    let findings = detector.scan_files(dir.path(), &[path]).expect("scan");
+    findings.into_iter().map(|f| f.rule_id).collect()
+}
+
+#[test]
+fn entropy_skips_minified_and_prose_files_but_rules_still_run() {
+    let detector = create_detector_with_entropy(EntropyConfig::default());
+    let entropy = r#"SECRET_TOKEN="xK9mB2vL5nQ8rT3wA7jP1hD6fY4cE0g""#;
+    assert!(scan_named(&detector, "app.env", entropy).contains(&"high-entropy-string".to_string()));
+    for name in [
+        "vendor.min.js",
+        "theme.min.css",
+        "bundle.js.map",
+        "LICENSE.txt",
+        "CHANGELOG-v4.md",
+        "third-party-licenses.json",
+    ] {
+        let rule_ids = scan_named(&detector, name, entropy);
+        assert!(rule_ids.is_empty(), "{name}: got {rule_ids:?}");
+    }
+    let token = r#"const t = "AKIAIOSFODNN7ABCDEFG";"#;
+    assert!(scan_named(&detector, "vendor.min.js", token)
+        .iter()
+        .any(|id| id.contains("aws")));
 }
 
 // ============================================================================

@@ -94,6 +94,10 @@ pub struct RuleAllow {
     pub patterns: Vec<String>,
     #[serde(default)]
     pub values: Vec<String>,
+    /// Regexes tested against the whole match instead of the captured value, for example to
+    /// accept a connection URI by its host.
+    #[serde(default)]
+    pub match_patterns: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

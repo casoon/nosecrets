@@ -271,7 +271,7 @@ installed `nosecrets` binary:
 ```yaml
 repos:
   - repo: https://github.com/casoon/nosecrets
-    rev: v0.5.1 # a release tag
+    rev: v0.5.2 # a release tag
     hooks:
       - id: nosecrets-system
 ```

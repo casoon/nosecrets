@@ -43,6 +43,22 @@ candidates in which common English and programming words cover at least half of 
 Interpolation like `${VAR}`, access like `os.environ["X"]` and generic types like
 `Promise<Foo<boolean>>` are skipped as well; a literal token next to them is still reported.
 
+The high-entropy detector skips minified and generated files (`*.min.js`, `*.min.css`, `*.map`) and
+files that are prose by nature (`LICENSE*`, `COPYING*`, `NOTICE*`, `CHANGELOG*`,
+`*third-party-licenses*`). The provider-specific rules still run on them. Values that start with an
+encryption envelope (`ENC[...]` from SOPS, `ENC(...)` from Jasypt, `$ANSIBLE_VAULT;`, `age-encryption.org/v1`)
+are skipped too. For a folder of values that are encrypted in another way, list its path:
+
+```toml
+[ignore]
+paths = ["knowledge/secrets/**"]
+```
+
+The connection URI rules (PostgreSQL, MySQL, MongoDB, Redis, SQL Server) do not report a URI whose
+host is `localhost`, `127.0.0.1`, `[::1]`, `0.0.0.0`, `host.docker.internal` or an `example.com`,
+`example.org` or `example.net` name, nor one whose password is a placeholder such as `PASSWORD`,
+`<password>` or `xxxxxx`.
+
 With `decode.base64 = true` (default), runs of 24 or more base64 characters (standard or URL-safe
 alphabet) are decoded one level deep and the decoded text is matched against the rules, so a
 base64-encoded token in a Kubernetes `Secret` is found. Set it to `false` to scan only the text as

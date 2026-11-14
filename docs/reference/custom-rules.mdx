@@ -64,6 +64,7 @@ values = ["int_000000000000000000000000"]
 | `paths.exclude` | list of globs | no | The rule skips these paths |
 | `allow.patterns` | list of regexes | no | Captured values matching one of them are not reported |
 | `allow.values` | list of strings | no | Exact captured values that are not reported |
+| `allow.match_patterns` | list of regexes | no | The whole match, not only the captured value, is tested; a match for one of them is not reported. Use it to accept a value by its surroundings, for example a connection URI by its host |
 
 ## Severity
 

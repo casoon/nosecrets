@@ -38,6 +38,7 @@ struct CompiledRule {
     regex: Regex,
     allow_patterns: Vec<Regex>,
     allow_values: HashSet<String>,
+    allow_match_patterns: Vec<Regex>,
     include_paths: Option<GlobSet>,
     exclude_paths: Option<GlobSet>,
     charset_regex: Option<Regex>,
@@ -74,7 +75,8 @@ impl Detector {
                     capture: rule.capture,
                 });
             }
-            let (allow_patterns, allow_values) = compile_rule_allow(rule.allow.as_ref())?;
+            let (allow_patterns, allow_values, allow_match_patterns) =
+                compile_rule_allow(rule.allow.as_ref())?;
             let (include_paths, exclude_paths) = compile_rule_paths(rule.paths.as_ref())?;
             let charset_regex = compile_charset(rule.validate.as_ref())?;
             compiled.push(CompiledRule {
@@ -82,6 +84,7 @@ impl Detector {
                 regex,
                 allow_patterns,
                 allow_values,
+                allow_match_patterns,
                 include_paths,
                 exclude_paths,
                 charset_regex,
@@ -235,7 +238,7 @@ impl Detector {
         }
 
         // Phase 2: Entropy-based detection
-        if self.entropy_config.enabled {
+        if self.entropy_config.enabled && !entropy::skips_path(rel_path) {
             let entropy_matches =
                 entropy::detect_entropy(&text, &self.entropy_config, &self.entropy_allow_patterns);
             for em in entropy_matches {
@@ -295,6 +298,10 @@ impl Detector {
                     continue;
                 };
                 let secret = matched.as_str();
+                let whole = caps.get(0).map_or(secret, |m| m.as_str());
+                if rule.allows_match(whole) {
+                    continue;
+                }
                 if !validate_secret(&rule.rule.validate, rule.charset_regex.as_ref(), secret) {
                     continue;
                 }
@@ -437,6 +444,12 @@ impl CompiledRule {
         true
     }
 
+    fn allows_match(&self, whole: &str) -> bool {
+        self.allow_match_patterns
+            .iter()
+            .any(|regex| regex.is_match(whole))
+    }
+
     fn is_allowed(&self, secret: &str) -> bool {
         if self.allow_values.contains(secret) {
             return true;
@@ -503,18 +516,25 @@ impl Prefilter {
     }
 }
 
-fn compile_rule_allow(allow: Option<&RuleAllow>) -> Result<(Vec<Regex>, HashSet<String>)> {
+type CompiledAllow = (Vec<Regex>, HashSet<String>, Vec<Regex>);
+
+fn compile_rule_allow(allow: Option<&RuleAllow>) -> Result<CompiledAllow> {
     let Some(allow) = allow else {
-        return Ok((Vec::new(), HashSet::new()));
+        return Ok((Vec::new(), HashSet::new(), Vec::new()));
     };
-    let mut patterns = Vec::new();
-    for pattern in &allow.patterns {
-        patterns.push(Regex::new(pattern).map_err(|source| {
+    let compile = |pattern: &String| {
+        Regex::new(pattern).map_err(|source| {
             Error::regex(format!("invalid allow regex pattern {pattern}"), source)
-        })?);
-    }
+        })
+    };
+    let patterns = allow.patterns.iter().map(compile).collect::<Result<_>>()?;
+    let match_patterns = allow
+        .match_patterns
+        .iter()
+        .map(compile)
+        .collect::<Result<_>>()?;
     let values = allow.values.iter().cloned().collect();
-    Ok((patterns, values))
+    Ok((patterns, values, match_patterns))
 }
 
 fn compile_rule_paths(paths: Option<&RulePaths>) -> Result<(Option<GlobSet>, Option<GlobSet>)> {
@@ -1045,6 +1065,7 @@ mod tests {
         rule.allow = Some(RuleAllow {
             patterns: vec!["ALLOW$".to_string()],
             values: Vec::new(),
+            match_patterns: Vec::new(),
         });
         let filter = Filter::from_config(None, Vec::new()).expect("filter");
         let detector = Detector::new(vec![rule], filter).expect("detector");

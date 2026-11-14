@@ -937,7 +937,7 @@ URL="https://example.com/api/v1"
     #[test]
     fn test_encrypted_guard_needs_the_marker_at_the_start() {
         assert!(flagged(
-            r#"api_key = "Zx9Qm2LpV7nR4tYbENC[8KdW3sJc6HgF5aEu""#
+            r#"api_key = "Zx9Qm2LpV7nR4tYbENC[8KdW3sJc6HgF5aEu""# // @nsi synthetic test value
         ));
     }
 

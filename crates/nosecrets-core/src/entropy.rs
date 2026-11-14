@@ -927,7 +927,7 @@ URL="https://example.com/api/v1"
             r#"api_key = "ENC[AES256_GCM,data:Zx9Qm2LpV7nR4tYb8KdW3sJc6HgF5aEu,iv:aB3dE5gH7jK9mN1pQ3sT5vX7zA9cE1gI3kM5oQ7sU9w=,tag:Zx9Qm2LpV7nR4tYb8KdW3s==,type:str]""#
         ));
         assert!(!flagged(
-            r#"password: "$ANSIBLE_VAULT;1.1;AES256Zx9Qm2LpV7nR4tYb8KdW3sJc6HgF5aEu""#
+            r#"password: "$ANSIBLE_VAULT;1.1;AES256Zx9Qm2LpV7nR4tYb8KdW3sJc6HgF5aEu""# // @nsi synthetic test value
         ));
         assert!(!flagged(
             r#"token = "ENC(Zx9Qm2LpV7nR4tYb8KdW3sJc6HgF5aEu)""#

@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-18
+
+### Changed
+
+- **Releases:** the build provenance attestation of the release binaries is created with `actions/attest-build-provenance` 4.2.2.
+- **Pages:** the project site uses current versions of Astro and its dependencies.
+
 ## [0.5.2] - 2026-11-14
 
 ### Added

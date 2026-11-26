@@ -338,6 +338,10 @@ git push origin main vX.Y.Z
 
 The tag workflow waits for CI, checks that the tag matches both manifests, and then publishes everything from GitHub Actions: `nosecrets-core` and `nosecrets-cli` to crates.io and `@casoon/nosecrets` to npm (both via Trusted Publishing, after approval in the `crates-io` and `npm` environments), and the binaries with `SHA256SUMS` and build provenance to the GitHub release. Nothing is published from a developer machine.
 
+## Author
+
+Built and maintained by [Jörn Seidel](https://www.casoon.de/joern-seidel/) ([CASOON](https://www.casoon.de/)). Background and design decisions are described in an article on Insights (in German): [nosecrets: Secrets aus Git-Commits fernhalten](https://insights.casoon.de/artikel/nosecrets-secret-scanner-git-pre-commit/).
+
 ## License
 
 MIT
